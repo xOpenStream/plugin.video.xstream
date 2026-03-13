@@ -8,7 +8,6 @@
 		<import addon="script.module.pyaes"/>
 		<import addon="repository.resolveurl" optional="true"/>
 		<import addon="script.module.inputstreamhelper" version="0.3.3" optional="true"/>
-		<import addon="script.module.pydevd" optional="true" />
 		<import addon="script.module.web-pdb" optional="true" />
 	</requires>
 	<extension point="xbmc.python.pluginsource" library="default.py">
