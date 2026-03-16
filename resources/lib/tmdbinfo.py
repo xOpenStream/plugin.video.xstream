@@ -48,8 +48,18 @@ def WindowsBoxes(sTitle, sFileName, metaType, year=''):
             self.setProperty('color', cConfig().getSetting('Color'))
             self.poster = 'https://image.tmdb.org/t/p/%s' % cConfig().getSetting('poster_tmdb')
             self.none_poster = 'https://eu.ui-avatars.com/api/?background=000&size=512&name=%s&color=FFF&font-size=0.33'
-            if 'trailer' in meta:
-                self.setProperty('isTrailer', 'true')
+            _tmdb_id = meta.get('tmdb_id', '')
+            _imdb_id = meta.get('imdb_id', '')
+            try:
+                from resources.lib.trailer import hasTrailer
+                if _tmdb_id and hasTrailer(str(_tmdb_id), str(_imdb_id) if _imdb_id else '', metaType):
+                    self.setProperty('isTrailer', 'true')
+            except Exception:
+                if 'trailer' in meta:
+                    self.setProperty('isTrailer', 'true')
+            self._trailer_title = sTitle
+            self._trailer_year = year
+            self._trailer_poster = meta.get('cover_url', '')
             self.setFocusId(9000)
             if 'credits' in meta and meta['credits']:
                 cast = []
@@ -131,21 +141,15 @@ def WindowsBoxes(sTitle, sFileName, metaType, year=''):
 
         def onClick(self, controlId):
             if controlId == 11:
-                if metaType == 'movie':
-                    sUrl = 'movie/%s/videos' % str(self.getProperty('tmdb_id'))
-                else:
-                    sUrl = 'tv/%s/videos' % str(self.getProperty('tmdb_id'))
-                meta = cTMDB().getUrl(sUrl)
-                name = []
-                url = []
-                for result in meta['results']:
-                    name.append((result['name']))
-                    url.append((result['key']))
-                index = xbmcgui.Dialog().select('Trailer/Teaser', name)
-                if index > -1:
-                    self.close()
-                    YT = 'plugin://plugin.video.youtube/play/?video_id=%s' % url[index]
-                    return xbmc.executebuiltin('RunPlugin(%s)' % YT)
+                _tid = self.getProperty('tmdb_id') or ''
+                self.close()
+                try:
+                    from resources.lib.trailer import playTrailer
+                    playTrailer(str(_tid), metaType, title=self._trailer_title,
+                                year=self._trailer_year, poster=self._trailer_poster,
+                                pref_lang=cConfig().getSetting('tmdb_lang') or 'de')
+                except Exception as e:
+                    xbmc.log('[xStream] Trailer error: %s' % e, xbmc.LOGERROR)
             elif controlId == 30:
                 self.close()
                 return
