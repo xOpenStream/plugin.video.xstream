@@ -56,6 +56,18 @@ def parseUrl():
         elif sFunction == 'searchTMDB':
             searchTMDB(params)
             return
+        elif sFunction == 'playTrailer':
+            try:
+                from resources.lib.trailer import playTrailer
+                parms = ParameterHandler()
+                title = parms.getValue('searchTitle') or ''
+                meta_type = parms.getValue('sMeta') or 'movie'
+                year = parms.getValue('sYear') or ''
+                thumbnail = parms.getValue('sThumbnail') or ''
+                playTrailer(None, meta_type, title=title, year=year, poster=thumbnail)
+            except Exception as e:
+                log(cConfig().getLocalizedString(30166) + ' -> [xstream]: Trailer error: %s' % e, LOGERROR)
+            return
         elif sFunction == 'devUpdates':
             from resources.lib import updateManager
             updateManager.devUpdates()

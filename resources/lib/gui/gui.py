@@ -229,10 +229,15 @@ class cGui:
         contextitem = cContextElement()
         if oGuiElement._mediaType == 'movie' or oGuiElement._mediaType == 'tvshow':
             if cConfig().getSetting('xstream.trailer') == 'true':
-                if not xbmc.getCondVisibility('System.HasAddon(%s)' % 'script.module.xstream.trailer'):  # Schauen ob Addon installiert
-                    xbmc.executebuiltin('InstallAddon(%s)' % 'script.module.xstream.trailer')  # Addon installieren
                 contextitem.setTitle(cConfig().getLocalizedString(30027))  # Trailer Funktion
-                contextmenus += [(contextitem.getTitle(), "RunPlugin(plugin://script.module.xstream.trailer/?action=play&name=%s&url=&language=)" % (itemValues['title'],),)]
+                trailerParams = {'searchTitle': oGuiElement.getTitle(), 'sMeta': oGuiElement._mediaType, 'sYear': oGuiElement._sYear}
+                if 'imdb_id' in itemValues and itemValues['imdb_id']:
+                    trailerParams['searchImdbID'] = itemValues['imdb_id']
+                if 'duration' in itemValues and itemValues['duration']:
+                    trailerParams['sDuration'] = itemValues['duration']
+                if 'cover_url' in itemValues and itemValues['cover_url']:
+                    trailerParams['sThumbnail'] = itemValues['cover_url']
+                contextmenus += [(contextitem.getTitle(), "RunPlugin(%s?function=playTrailer&%s)" % (self.pluginPath, urlencode(trailerParams),),)]
         if oGuiElement._mediaType == 'movie' or oGuiElement._mediaType == 'tvshow':
             contextitem.setTitle(cConfig().getLocalizedString(30239))   # Erweiterte Info
             searchParams = {'searchTitle': oGuiElement.getTitle(), 'sMeta': oGuiElement._mediaType, 'sYear': oGuiElement._sYear}
