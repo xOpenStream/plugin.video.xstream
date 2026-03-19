@@ -1183,7 +1183,7 @@ def playTrailer(tmdb_id, mediatype='movie', title='', year='', poster='', pref_l
     tmdb_en = cTMDB(lang='en')  # EN for English title + IMDB ID
     en_data = None
     try:
-        term = 'append_to_response=videos'
+        term = 'append_to_response=videos&include_video_language=de,en,null'
         if url_type == 'tv':
             term += ',external_ids'
         en_data = tmdb_en.getUrl('%s/%s' % (url_type, tmdb_id), term=term)
