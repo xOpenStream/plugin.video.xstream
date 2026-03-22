@@ -15,23 +15,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check if any workflow files changed
-        id: check
+      - name: Detect changed files
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          base: ${{ github.base_ref }}
+          filters: |
+            workflows:
+              - '.github/workflows/**'
+
+      - name: Fail if workflows were changed
+        if: steps.filter.outputs.workflows == 'true'
         run: |
-          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E '^\\.github/workflows/' || true)
-          
-          if [ -n "$CHANGED" ]; then
-            echo "Workflow change detected:"
-            echo "$CHANGED"
-            echo ""
-            echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-            echo "Admin-Review required"
-            echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-            exit 1
-          else
-            echo "no change on workflow"
-            exit 0
-          fi
+          echo "::error title=Protected path::Changed .github/workflows/ requires admin review."
+          exit 1
 
       - name: Summary (optional – nur Info)
         if: always()
