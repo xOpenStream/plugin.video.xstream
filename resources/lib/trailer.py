@@ -420,13 +420,11 @@ def _yearConflict(vtitle, year):
 
 
 def _titleOkChannel(vtitle, title, year=''):
-    """Title check for curated channel results (KinoCheck): title match, trailer word, no Shorts/junk, year conflict."""
+    """Title check for curated channel results (KinoCheck): title match, no Shorts, year conflict."""
     vl = _htmlDecode(vtitle).lower()
     if title.lower() not in vl:
         return False
-    if not any(w in vl for w in _TRAILER_WORDS):
-        return False
-    if any(w in vl for w in _JUNK_WORDS):
+    if '#short' in vl:
         return False
     if _yearConflict(vtitle, year):
         return False

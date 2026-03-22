@@ -59,7 +59,7 @@ class cHosterGui:
             return False
         # resolver response
         if link is not False:
-            data = {'title': fileName, 'season': params.getValue('season'), 'episode': params.getValue('episode'), 'showTitle': params.getValue('TVShowTitle'), 'thumb': params.getValue('thumb'), 'link': link}
+            data = {'title': fileName, 'season': params.getValue('season'), 'episode': params.getValue('episode'), 'showTitle': params.getValue('TVShowTitle'), 'thumb': params.getValue('thumb'), 'link': link, 'imdb_id': params.getValue('imdb_id'), 'year': params.getValue('year'), 'mediaType': params.getValue('mediaType')}
             return data
         return False
 
@@ -103,6 +103,13 @@ class cHosterGui:
             info['Episode'] = data['episode']
             info['Season'] = data['season']
             info['TVShowTitle'] = data['showTitle']
+            info['mediatype'] = 'episode'
+        elif data.get('mediaType') == 'movie':
+            info['mediatype'] = 'movie'
+        if data.get('year'):
+            info['Year'] = data['year']
+        if data.get('imdb_id'):
+            info['imdbnumber'] = data['imdb_id']
 
         #Neuer Video-Tag, mit Kodi 19 nicht kompatibel, daher folgende Abfrage
         kodi_version = xbmc.getInfoLabel('System.BuildVersion')
@@ -110,7 +117,13 @@ class cHosterGui:
             list_item.setInfo(type="Video", infoLabels=info)
         else:
             vtag = list_item.getVideoInfoTag()
-            vtag.setMediaType('video')
+            # Korrekten MediaType setzen (für Trakt.TV Scrobbling)
+            if data.get('showTitle') and data.get('episode'):
+                vtag.setMediaType('episode')
+            elif data.get('mediaType') in ('movie', 'episode', 'tvshow', 'season'):
+                vtag.setMediaType(data['mediaType'])
+            else:
+                vtag.setMediaType('video')
             if 'Title' in info:
                 try:
                     vtag.setTitle(str(info['Title']))
@@ -126,6 +139,16 @@ class cHosterGui:
             if 'TVShowTitle' in info:
                 try:
                     vtag.setTvShowTitle(info['TVShowTitle'])
+                except: pass
+            # Jahr und IMDb ID setzen (für Trakt.TV Scrobbling)
+            if data.get('year'):
+                try:
+                    vtag.setYear(int(data['year']))
+                except: pass
+            if data.get('imdb_id'):
+                try:
+                    vtag.setUniqueID(str(data['imdb_id']), 'imdb', True)
+                    vtag.setIMDBNumber(str(data['imdb_id']))
                 except: pass
 
         list_item.setProperty('IsPlayable', 'true')
@@ -159,34 +182,44 @@ class cHosterGui:
         return True
 
     def download(self, siteResult=False):
-        from resources.lib.download import cDownload
         logger.info('-> [hoster]: attempt download')
         data = self._getInfoAndResolve(siteResult)
         if not data: return False
         logger.info('-> [hoster]: download file link: ' + data['link'])
         if self.dialog:
             self.dialog.close()
-        oDownload = cDownload()
-        oDownload.download(data['link'], data['title'])
-        return True
 
-    def sendToPyLoad(self, siteResult=False):
-        from resources.lib.handler.pyLoadHandler import cPyLoadHandler
-        logger.info('-> [hoster]: attempt download with pyLoad')
-        data = self._getInfoAndResolve(siteResult)
-        if not data: return False
-        cPyLoadHandler().sendToPyLoad(data['title'], data['link'])
-        return True
+        # Check which download managers are configured
+        downloadOptions = []
+        downloadModes = []
+        if cConfig().getSetting('jd2_enabled') == 'true':
+            downloadOptions.append('JDownloader 2')
+            downloadModes.append('jd2')
+        if cConfig().getSetting('myjd_enabled') == 'true':
+            downloadOptions.append('My.JDownloader')
+            downloadModes.append('myjd')
 
-    def sendToJDownloader(self, sMediaUrl=False):
-        from resources.lib.handler.jdownloaderHandler import cJDownloaderHandler
-        params = ParameterHandler()
-        if not sMediaUrl:
-            sMediaUrl = params.getValue('sMediaUrl')
-        if self.dialog:
-            self.dialog.close()
-        logger.info('-> [hoster]: call send to JDownloader: ' + sMediaUrl)
-        cJDownloaderHandler().sendToJDownloader(sMediaUrl)
+
+        selectedMode = 'direct'
+        if downloadOptions:
+            # Add direct download as last option
+            downloadOptions.append(cConfig().getLocalizedString(30245))  # "Download"
+            downloadModes.append('direct')
+            dialog = xbmcgui.Dialog()
+            idx = dialog.select('Download', downloadOptions)
+            if idx < 0:
+                return False  # User cancelled
+            selectedMode = downloadModes[idx]
+
+        if selectedMode == 'jd2':
+            self.sendToJDownloader2(siteResult['streamUrl'] if siteResult and 'streamUrl' in siteResult else data['link'])
+        elif selectedMode == 'myjd':
+            self.sendToMyJDownloader(siteResult['streamUrl'] if siteResult and 'streamUrl' in siteResult else data['link'], data['title'])
+        else:
+            from resources.lib.download import cDownload
+            oDownload = cDownload()
+            oDownload.download(data['link'], data['title'])
+        return True
 
     def sendToJDownloader2(self, sMediaUrl=False):
         from resources.lib.handler.jdownloader2Handler import cJDownloader2Handler
@@ -319,9 +352,7 @@ class cHosterGui:
                 return
 
             self.dialog.update(60, cConfig().getLocalizedString(30143))
-            # Sitplugins VOD mit in automatische Abspielliste aufnehmen (Da Links bei der Überprüfung der Verfügbarkeit gekickt werden)
-            if (playMode != 'jd') and (playMode != 'jd2') and (playMode != 'pyload') and (cConfig().getSetting('presortHoster') == 'true') and (playMode != 'myjd'):
-            #if (not siteName.startswith('vod_')) and (playMode != 'jd') and (playMode != 'jd2') and (playMode != 'pyload') and (cConfig().getSetting('presortHoster') == 'true') and (playMode != 'myjd'):
+            if (playMode != 'jd2') and (cConfig().getSetting('presortHoster') == 'true') and (playMode != 'myjd'):
                 siteResult = self.__getPriorities(siteResult)
             if not siteResult:
                 self.dialog.close()
@@ -367,14 +398,10 @@ class cHosterGui:
             self.download(siteResult)
         elif playMode == 'enqueue':
             self.addToPlaylist(siteResult)
-        elif playMode == 'jd':
-            self.sendToJDownloader(siteResult['streamUrl'])
         elif playMode == 'jd2':
             self.sendToJDownloader2(siteResult['streamUrl'])
         elif playMode == 'myjd':
             self.sendToMyJDownloader(siteResult['streamUrl'])
-        elif playMode == 'pyload':
-            self.sendToPyLoad(siteResult)
 
     def streamAuto(self, playMode, siteName, function):
         logger.info('-> [hoster]: auto stream initiated')
@@ -399,8 +426,7 @@ class cHosterGui:
             self.dialog.update(90, cConfig().getLocalizedString(30143))
             functionName = siteResult[-1]
             del siteResult[-1]
-            # Sitplugins aus dem VOD Bereich bei self.__getPriorities(siteResult) ausschliessen da sonst die Hoster gekickt werden.
-            if siteName.startswith('dummy'): #Falls Servernamen im VOD sich ändern, hier vod_ eintragen
+            if siteName.startswith('dummy'):
                 hosters = siteResult
             else:
                 hosters = self.__getPriorities(siteResult)

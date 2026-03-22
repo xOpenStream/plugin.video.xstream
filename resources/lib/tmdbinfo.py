@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Python 3
 
+import ast
 import xbmc
 import time
 import xbmcgui
@@ -48,26 +49,14 @@ def WindowsBoxes(sTitle, sFileName, metaType, year=''):
             self.setProperty('color', cConfig().getSetting('Color'))
             self.poster = 'https://image.tmdb.org/t/p/%s' % cConfig().getSetting('poster_tmdb')
             self.none_poster = 'https://eu.ui-avatars.com/api/?background=000&size=512&name=%s&color=FFF&font-size=0.33'
-            _tmdb_id = meta.get('tmdb_id', '')
-            _imdb_id = meta.get('imdb_id', '')
-            try:
-                from resources.lib.trailer import hasTrailer
-                if _tmdb_id and hasTrailer(str(_tmdb_id), str(_imdb_id) if _imdb_id else '', metaType):
-                    self.setProperty('isTrailer', 'true')
-            except Exception:
-                if 'trailer' in meta:
-                    self.setProperty('isTrailer', 'true')
-            self._trailer_title = sTitle
-            self._trailer_year = year
-            self._trailer_poster = meta.get('cover_url', '')
             self.setFocusId(9000)
             if 'credits' in meta and meta['credits']:
                 cast = []
                 crew = []
                 try:
-                    data = eval(str(meta['credits'].encode('latin-1'), 'utf-8'))
+                    data = ast.literal_eval(str(meta['credits'].encode('latin-1'), 'utf-8'))
                 except Exception:
-                    data = eval(str(meta['credits']))
+                    data = ast.literal_eval(str(meta['credits']))
 
                 listitems = []
                 if 'cast' in data and data['cast']:
@@ -121,6 +110,23 @@ def WindowsBoxes(sTitle, sFileName, metaType, year=''):
                     else:
                         self.setProperty(prop, str(meta[prop]))
 
+            import threading
+            _tmdb_id = str(meta.get('tmdb_id', ''))
+            _imdb_id = str(meta.get('imdb_id', ''))
+            _dialog = self
+            _meta = meta
+            def _bgTrailerCheck():
+                try:
+                    from resources.lib.trailer import hasTrailer
+                    if _tmdb_id and hasTrailer(_tmdb_id, _imdb_id, metaType):
+                        _dialog.setProperty('isTrailer', 'true')
+                except Exception:
+                    if 'trailer' in _meta:
+                        _dialog.setProperty('isTrailer', 'true')
+            t = threading.Thread(target=_bgTrailerCheck)
+            t.daemon = True
+            t.start()
+
         def credit(self, meta='', control=''):
             listitems = []
             if not meta:
@@ -141,15 +147,26 @@ def WindowsBoxes(sTitle, sFileName, metaType, year=''):
 
         def onClick(self, controlId):
             if controlId == 11:
-                _tid = self.getProperty('tmdb_id') or ''
+                _tmdb_id = str(self.getProperty('tmdb_id'))
+                _poster = self.getProperty('cover_url') or ''
                 self.close()
                 try:
                     from resources.lib.trailer import playTrailer
-                    playTrailer(str(_tid), metaType, title=self._trailer_title,
-                                year=self._trailer_year, poster=self._trailer_poster,
-                                pref_lang=cConfig().getSetting('tmdb_lang') or 'de')
-                except Exception as e:
-                    xbmc.log('[xStream] Trailer error: %s' % e, xbmc.LOGERROR)
+                    from resources.lib.config import cConfig
+                    _tmdb_lang = cConfig().getSetting('tmdb_lang') or 'de'
+                    playTrailer(
+                        tmdb_id=_tmdb_id,
+                        mediatype=metaType,
+                        title=sTitle,
+                        year=year,
+                        poster=_poster,
+                        pref_lang=_tmdb_lang,
+                    )
+                except Exception:
+                    import traceback
+                    xbmc.log('[xstream.trailer] onClick error: %s' % traceback.format_exc(), xbmc.LOGERROR)
+                    xbmc.executebuiltin("Notification(Trailer, Trailer-Suche fehlgeschlagen, 3000, '')")
+                return
             elif controlId == 30:
                 self.close()
                 return
@@ -161,7 +178,7 @@ def WindowsBoxes(sTitle, sFileName, metaType, year=''):
                     meta = cTMDB().getUrl(sUrl, '', "append_to_response=movie_credits,tv_credits")
                     meta_credits = meta['movie_credits']['cast']
                     self.credit(meta_credits, 5215)
-                    sTitle = meta['name']
+                    personName = meta['name']
                     if not meta['deathday']:
                         today = date.today()
                         try:
@@ -172,7 +189,7 @@ def WindowsBoxes(sTitle, sFileName, metaType, year=''):
                             age = ''
                     else:
                         age = meta['deathday']
-                    self.setProperty('Person_name', sTitle)
+                    self.setProperty('Person_name', personName)
                     self.setProperty('Person_birthday', meta['birthday'])
                     self.setProperty('Person_place_of_birth', meta['place_of_birth'])
                     self.setProperty('Person_deathday', str(age))
