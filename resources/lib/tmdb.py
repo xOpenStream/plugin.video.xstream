@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Python 3
 
+import ast
 import json
 import re
 
@@ -310,7 +311,7 @@ class cTMDB:
                     _meta['studio'] += ' / ' + studio['name']
         if 'credits' in meta and meta['credits']:
             strmeta = str(meta['credits'])
-            listCredits = eval(strmeta)
+            listCredits = ast.literal_eval(strmeta)
             casts = listCredits['cast']
             crews = []
             if len(casts) > 0:

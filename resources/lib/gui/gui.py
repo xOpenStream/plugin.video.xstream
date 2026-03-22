@@ -229,10 +229,21 @@ class cGui:
         contextitem = cContextElement()
         if oGuiElement._mediaType == 'movie' or oGuiElement._mediaType == 'tvshow':
             if cConfig().getSetting('xstream.trailer') == 'true':
-                if not xbmc.getCondVisibility('System.HasAddon(%s)' % 'script.module.xstream.trailer'):  # Schauen ob Addon installiert
-                    xbmc.executebuiltin('InstallAddon(%s)' % 'script.module.xstream.trailer')  # Addon installieren
                 contextitem.setTitle(cConfig().getLocalizedString(30027))  # Trailer Funktion
-                contextmenus += [(contextitem.getTitle(), "RunPlugin(plugin://script.module.xstream.trailer/?action=play&name=%s&url=&language=)" % (itemValues['title'],),)]
+                trailerParams = {
+                    'function': 'playTrailer',
+                    'title': oGuiElement.getTitle(),
+                    'year': oGuiElement._sYear,
+                    'mediatype': oGuiElement._mediaType,
+                    'poster': oGuiElement.getThumbnail(),
+                }
+                if 'tmdb_id' in itemValues and itemValues['tmdb_id']:
+                    trailerParams['tmdb_id'] = str(itemValues['tmdb_id'])
+                trailerUrl = "%s?%s" % (self.pluginPath, urlencode(trailerParams))
+                contextmenus += [(contextitem.getTitle(), "RunPlugin(%s)" % trailerUrl)]
+                # Trailer-URL als ListItem-Property setzen damit Skins
+                # den Trailer auch in Widgets anzeigen koennen
+                listitem.setProperty('trailer', trailerUrl)
         if oGuiElement._mediaType == 'movie' or oGuiElement._mediaType == 'tvshow':
             contextitem.setTitle(cConfig().getLocalizedString(30239))   # Erweiterte Info
             searchParams = {'searchTitle': oGuiElement.getTitle(), 'sMeta': oGuiElement._mediaType, 'sYear': oGuiElement._sYear}
@@ -269,18 +280,12 @@ class cGui:
             contextmenus += [(contextitem.getTitle(), "RunPlugin(%s&playMode=enqueue)" % (sUrl,),)]
             contextitem.setTitle(cConfig().getLocalizedString(30245))   # Download
             contextmenus += [(contextitem.getTitle(), "RunPlugin(%s&playMode=download)" % (sUrl,),)]
-            if cConfig().getSetting('jd_enabled') == 'true':
-                contextitem.setTitle(cConfig().getLocalizedString(30246))   # send JD
-                contextmenus += [(contextitem.getTitle(), "RunPlugin(%s&playMode=jd)" % (sUrl,),)]
             if cConfig().getSetting('jd2_enabled') == 'true':
                 contextitem.setTitle(cConfig().getLocalizedString(30247))   # Send JD2
                 contextmenus += [(contextitem.getTitle(), "RunPlugin(%s&playMode=jd2)" % (sUrl,),)]
             if cConfig().getSetting('myjd_enabled') == 'true':
                 contextitem.setTitle(cConfig().getLocalizedString(30248))   # Send myjd
                 contextmenus += [(contextitem.getTitle(), "RunPlugin(%s&playMode=myjd)" % (sUrl,),)]
-            if cConfig().getSetting('pyload_enabled') == 'true':
-                contextitem.setTitle(cConfig().getLocalizedString(30249))   # Send Pyload
-                contextmenus += [(contextitem.getTitle(), "RunPlugin(%s&playMode=pyload)" % (sUrl,),)]
             if cConfig().getSetting('hosterSelect') == 'Auto':
                 contextitem.setTitle(cConfig().getLocalizedString(30149))   # select Hoster
                 contextmenus += [(contextitem.getTitle(), "RunPlugin(%s&playMode=play&manual=1)" % (sUrl,),)]
@@ -348,6 +353,11 @@ class cGui:
                 params.setParam('mediaType', 'season')
             if 'episode' in itemValues and itemValues['episode'] and float(itemValues['episode']) > 0:
                 params.setParam('mediaType', 'episode')
+            # Pass imdb_id and year for Trakt.TV scrobbling
+            if 'imdb_id' in itemValues and itemValues['imdb_id']:
+                params.setParam('imdb_id', itemValues['imdb_id'])
+            if 'year' in itemValues and itemValues['year']:
+                params.setParam('year', itemValues['year'])
         sParams = params.getParameterAsUri()
         try:
             if params.getValue('sUrl').startswith("plugin://"):

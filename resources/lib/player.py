@@ -13,7 +13,6 @@ class XstreamPlayer(xbmc.Player):
         self.streamSuccess = True
         self.playedTime = 0
         self.totalTime = 999999
-        self.from_global_search = False  # Track if started from Global Search
         log(cConfig().getLocalizedString(30166) + ' -> [player]: player instance created', LOGNOTICE)
 
     def onPlayBackStarted(self):
@@ -23,23 +22,6 @@ class XstreamPlayer(xbmc.Player):
         except:
             self.totalTime = 999999
 
-        # Detect if playback started from Global Search
-        try:
-            path = xbmc.getInfoLabel('Container.FolderPath')
-            if path:
-                low = path.lower()
-                keywords = [
-                    'function=globalsearch',
-                    'site=globalsearch',
-                    'function=searchalter',
-                    'function=searchtmdb'
-                ]
-                if any(kw in low for kw in keywords):
-                    self.from_global_search = True
-                    log(cConfig().getLocalizedString(30166) + ' -> [player]: Detected Global Search context', LOGNOTICE)
-        except:
-            pass
-
     def onPlayBackStopped(self):
         log(cConfig().getLocalizedString(30166) + ' -> [player]: Playback stopped', LOGNOTICE)
         if self.playedTime == 0 and self.totalTime == 999999:
@@ -47,17 +29,12 @@ class XstreamPlayer(xbmc.Player):
             log(cConfig().getLocalizedString(30166) + ' -> [player]: Kodi failed to open stream', LOGERROR)
         self.streamFinished = True
 
-        # After playback ends, if we came from Global Search → return to main menu
-        if self.from_global_search:
-            try:
-                xbmc.executebuiltin('Container.Update(plugin://plugin.video.xstream/)')
-                log('xStream -> [player]: Returning to addon main menu after Global Search', LOGNOTICE)
-            except Exception as e:
-                log('xStream -> [player]: Failed to return to main menu: %s' % str(e), LOGERROR)
-
     def onPlayBackEnded(self):
         log(cConfig().getLocalizedString(30166) + ' -> [player]: Playback completed', LOGNOTICE)
-        self.onPlayBackStopped()
+        if self.playedTime == 0 and self.totalTime == 999999:
+            self.streamSuccess = False
+        self.streamFinished = True
+
 
 
 class cPlayer:

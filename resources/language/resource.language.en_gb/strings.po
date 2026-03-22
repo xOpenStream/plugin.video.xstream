@@ -1712,3 +1712,15 @@ msgstr ""
 msgctxt "#30812"
 msgid "Western film"
 msgstr ""
+
+msgctxt "#30818"
+msgid "Domain Check"
+msgstr "Domain Check"
+
+msgctxt "#30819"
+msgid "Checking all provider domains..."
+msgstr "Überprüfe alle Provider-Domains..."
+
+msgctxt "#30820"
+msgid "Domain check completed!"
+msgstr "Domain Check abgeschlossen!"

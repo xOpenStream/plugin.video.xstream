@@ -42,6 +42,17 @@ class ParameterHandler:
         for key, value in paramDict.items():
             self.__params.update({key: str(value)})
 
+    def to_dict(self):
+        """Serialize parameters to a plain dict for caching."""
+        return dict(self.__params)
+
+    @classmethod
+    def from_dict(cls, data):
+        """Reconstruct a ParameterHandler from a cached dict."""
+        obj = cls.__new__(cls)
+        obj.__params = dict(data) if data else {}
+        return obj
+
     def getParameterAsUri(self):
         outParams = dict()
         if 'params' in self.__params:
