@@ -269,6 +269,65 @@ class cGuiElement:
     def setSubLanguage(self, sLang):
         self._sSubLanguage = str(sLang)
 
+    def to_dict(self):
+        """Serialize this GuiElement to a plain dict for caching."""
+        return {
+            'sType': self.__sType,
+            'sMediaUrl': self.__sMediaUrl,
+            'sTitle': self.__sTitle,
+            'sTitleSecond': self.__sTitleSecond,
+            'sDescription': self.__sDescription,
+            'sThumbnail': self.__sThumbnail,
+            'sIcon': self.__sIcon,
+            'aItemValues': self.__aItemValues,
+            'aProperties': self.__aProperties,
+            'aContextElements': [],  # context elements are rebuilt by the GUI
+            'sFanart': self.__sFanart,
+            'sSiteName': self.__sSiteName,
+            'sFunctionName': self.__sFunctionName,
+            'sLanguage': self._sLanguage,
+            'sSubLanguage': self._sSubLanguage,
+            'sYear': self._sYear,
+            'sQuality': self._sQuality,
+            'sInfo': self._sInfo,
+            'mediaType': self._mediaType,
+            'season': self._season,
+            'episode': self._episode,
+            'tmdbID': self._tmdbID,
+            'rating': self._rating,
+            'isMetaSet': self._isMetaSet,
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        """Reconstruct a GuiElement from a cached dict."""
+        obj = cls()
+        obj.__sType = data.get('sType', 'video')
+        obj.__sMediaUrl = data.get('sMediaUrl', '')
+        obj.__sTitle = data.get('sTitle', '')
+        obj.__sTitleSecond = data.get('sTitleSecond', '')
+        obj.__sDescription = data.get('sDescription', '')
+        obj.__sThumbnail = data.get('sThumbnail', '')
+        obj.__sIcon = data.get('sIcon', cls.DEFAULT_FOLDER_ICON)
+        obj.__aItemValues = data.get('aItemValues', {})
+        obj.__aProperties = data.get('aProperties', {})
+        obj.__aContextElements = []
+        obj.__sFanart = data.get('sFanart', cls.DEFAULT_FANART)
+        obj.__sSiteName = data.get('sSiteName', None)
+        obj.__sFunctionName = data.get('sFunctionName', None)
+        obj._sLanguage = data.get('sLanguage', '')
+        obj._sSubLanguage = data.get('sSubLanguage', '')
+        obj._sYear = data.get('sYear', '')
+        obj._sQuality = data.get('sQuality', '')
+        obj._sInfo = data.get('sInfo', '')
+        obj._mediaType = data.get('mediaType', '')
+        obj._season = data.get('season', '')
+        obj._episode = data.get('episode', '')
+        obj._tmdbID = data.get('tmdbID', '')
+        obj._rating = data.get('rating', '')
+        obj._isMetaSet = data.get('isMetaSet', False)
+        return obj
+
     def getMeta(self, mediaType, tmdbID='', TVShowTitle='', season='', episode='', mode='add'):
         '''
         Fetch metainformations for GuiElement.

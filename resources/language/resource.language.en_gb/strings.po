@@ -1,7 +1,7 @@
 # Addon Name: xStream
 # Addon id: plugin.video.xStream
 # Addon Provider: xStream
-# Use the following entry for the translation
+# Benutze folgenden Eintrag für die Übersetzung
 # from resources.lib.config import cConfig + cConfig().getLocalizedString(30041)	
 
 msgid ""
@@ -17,10 +17,6 @@ msgstr ""
 
 msgctxt "#30002"
 msgid "Preferred language"
-msgstr ""
-
-msgctxt "#30003"
-msgid "Show XXX-Content for adult users"
 msgstr ""
 
 msgctxt "#30004"
@@ -159,8 +155,6 @@ msgctxt "#30044"
 msgid "TMDB extended information (slow)"
 msgstr ""
 
-# Platzhalter
-
 msgctxt "#30050"
 msgid "Use Site-Plugin"
 msgstr ""
@@ -237,9 +231,7 @@ msgctxt "#30081"
 msgid "Download-Folder"
 msgstr ""
 
-msgctxt "#30082"
-msgid "PyLoad on/off"
-msgstr ""
+
 
 msgctxt "#30083"
 msgid "E-Mail"
@@ -278,7 +270,7 @@ msgid "xStream Updates"
 msgstr ""
 
 msgctxt "#30097"
-msgid "[COLOR red]Nightly versions can contain new functions, but also bugs.[/COLOR]"
+msgid "[COLOR red]Nightly versions can contain new functions, but also bugs."
 msgstr ""
 
 msgctxt "#30098"
@@ -354,15 +346,15 @@ msgid "No xStream update available."
 msgstr ""
 
 msgctxt "#30116"
-msgid " update installed successfully."
+msgid "ResolveURL update successful."
 msgstr ""
 
 msgctxt "#30117"
-msgid "Resolver update finished with errors."
+msgid "ResolveURL update error."
 msgstr ""
 
 msgctxt "#30118"
-msgid "No Resolver update available."
+msgid "No ResolveURL update available."
 msgstr ""
 
 msgctxt "#30119"
@@ -374,7 +366,7 @@ msgid "You don't have a working ResolveUrl installed, no videos can be played pl
 msgstr ""
 
 msgctxt "#30121"
-msgid "Start manual update"
+msgid "ResolveURL Update"
 msgstr ""
 
 msgctxt "#30122"
@@ -555,7 +547,7 @@ msgstr ""
 
 msgctxt "#30166"
 msgid "[xStream]"
-msgstr "[xStream]"
+msgstr ""
 
 msgctxt "#30167"
 msgid "Choose xStream Github Branch"
@@ -580,6 +572,7 @@ msgstr ""
 msgctxt "#30172"
 msgid "TMDB language setting"
 msgstr ""
+
 
 msgctxt "#30173"
 msgid "[COLOR green]Release - Version directly from xStream Github.[/COLOR][CR][COLOR orange]Nightly - Version with hotfixes from the xStream team.[/COLOR]"
@@ -885,9 +878,7 @@ msgctxt "#30248"
 msgid "Send to My.JDownloader"
 msgstr ""
 
-msgctxt "#30250"
-msgid "Send to PyLoad"
-msgstr ""
+
 
 msgctxt "#30251"
 msgid "Choose page"
@@ -913,9 +904,7 @@ msgctxt "#30256"
 msgid "Link sent"
 msgstr ""
 
-msgctxt "#30257"
-msgid "PyLoad"
-msgstr ""
+
 
 msgctxt "#30258"
 msgid "Error sending link!"
@@ -930,7 +919,7 @@ msgid "Your ISP censors your Internet access!"
 msgstr ""
 
 msgctxt "#30261"
-msgid "To protect yourself from censorship, we recommend to use the new setting in xStream called 'Evade DNS lock' or change your DNS at your router and/or boxes to Google or Cloudflare - for both ipV4 and ipV6 protocols. Instructions can be found with a Google search, e.g. 'Change Fritzbox DNS Server'"
+msgid "To protect yourself from censorship, we recommend to use the new setting in xStream called 'Evade DNS lock' or change your DNS at your router and/or boxes to Google or Cloudflare - for both IPvV4 and IPv6 protocols. Instructions can be found with a Google search, e.g. 'Change Fritzbox DNS Server'"
 msgstr ""
 
 msgctxt "#30262"
@@ -1014,10 +1003,6 @@ msgid "Please enter the movie or series title."
 msgstr ""
 
 msgctxt "#30282"
-msgid "Please choose a number between 1 and "
-msgstr ""
-
-msgctxt "#30283"
 msgid "Please choose a number between 1 and "
 msgstr ""
 
@@ -1138,7 +1123,7 @@ msgid "[B][COLOR cyan]xStream[/COLOR] [COLOR white]Warning (Developer Options)[/
 msgstr ""
 
 msgctxt "#30323"
-msgid "Recaptcha"
+msgid "ReCaptcha"
 msgstr ""
 
 msgctxt "#30324"
@@ -1183,18 +1168,6 @@ msgstr ""
 
 msgctxt "#30406"
 msgid "Choose xStream Version"
-msgstr ""
-
-msgctxt "#30407"
-msgid "Site-Plugins VoD"
-msgstr ""
-
-msgctxt "#30408"
-msgid "VoD index pages"
-msgstr ""
-
-msgctxt "#30409"
-msgid "Enable VoD index pages"
 msgstr ""
 
 msgctxt "#30410"
@@ -1384,7 +1357,7 @@ msgid "All Series"
 msgstr ""
 
 msgctxt "#30519"
-msgid "Popular Series"
+msgid "Popular Animes"
 msgstr ""
 
 msgctxt "#30520"
@@ -1523,6 +1496,50 @@ msgctxt "#30553"
 msgid "Actors"
 msgstr ""
 
+msgctxt "#30554"
+msgid "New"
+msgstr ""
+
+msgctxt "#30555"
+msgid "Trends"
+msgstr ""
+
+msgctxt "#30556"
+msgid "Latest Seasons"
+msgstr ""
+
+msgctxt "#30557"
+msgid "Latest Episodes"
+msgstr ""
+
+msgctxt "#30558"
+msgid ">>> Next Page"
+msgstr ""
+
+msgctxt "#30559"
+msgid "Specials"
+msgstr ""
+
+msgctxt "#30560"
+msgid "Most Watched Right Now"
+msgstr ""
+
+msgctxt "#30561"
+msgid "New Animes"
+msgstr ""
+
+msgctxt "#30562"
+msgid "Recently added"
+msgstr ""
+
+msgctxt "#30563"
+msgid "Enter year (e.g., 2017)"
+msgstr ""
+
+msgctxt "#30564"
+msgid "Year"
+msgstr ""
+
 ############### Site Plugins ###############
 
 msgctxt "#30700"
@@ -1558,7 +1575,7 @@ msgid "Topstreamfilm"
 msgstr ""
 
 msgctxt "#30708"
-msgid "KinoX"
+msgid "FilmPro"
 msgstr ""
 
 msgctxt "#30709"
@@ -1641,24 +1658,6 @@ msgctxt "#30728"
 msgid "Moflix-Stream"
 msgstr ""
 
-############### VoD Plugins ###############
-
-msgctxt "#30790"
-msgid "Video on Demand - Huhu"
-msgstr ""
-
-msgctxt "#30791"
-msgid "Video on Demand - Kool"
-msgstr ""
-
-msgctxt "#30792"
-msgid "Video on Demand - Oha"
-msgstr ""
-
-msgctxt "#30793"
-msgid "Video on Demand - Vavoo"
-msgstr ""
-
 ############### Genre ###############
 
 msgctxt "#30800"
@@ -1712,3 +1711,47 @@ msgstr ""
 msgctxt "#30812"
 msgid "Western film"
 msgstr ""
+
+msgctxt "#30813"
+msgid "What's New"
+msgstr ""
+
+msgctxt "#30814"
+msgid "A-Z"
+msgstr ""
+
+msgctxt "#30815"
+msgid "Genres"
+msgstr ""
+
+msgctxt "#30816"
+msgid "All Genres"
+msgstr ""
+
+msgctxt "#30817"
+msgid "Popular Genres"
+msgstr ""
+
+msgctxt "#30818"
+msgid "Domain Check"
+msgstr "Domain Check"
+
+msgctxt "#30819"
+msgid "Checking all provider domains..."
+msgstr "Checking all provider domains..."
+
+msgctxt "#30820"
+msgid "Domain check completed!"
+msgstr "Domain check completed!"
+
+msgctxt "#30821"
+msgid "Changelog is empty"
+msgstr "Changelog is empty"
+
+msgctxt "#30822"
+msgid "No Changelog available"
+msgstr "No Changelog available"
+
+msgctxt "#30823"
+msgid "No entry available in preferred language.[CR]Please change your preferred language in the xStream settings."
+msgstr "No entry available in preferred language.[CR]Please change your preferred language in the xStream settings."

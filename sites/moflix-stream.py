@@ -10,6 +10,7 @@
 
 import json
 
+import xbmcgui
 from resources.lib.handler.ParameterHandler import ParameterHandler
 from resources.lib.handler.requestHandler import cRequestHandler
 from resources.lib.tools import logger, cParser
@@ -44,6 +45,7 @@ URL_HOSTER = URL_MAIN + 'api/v1/titles/%s?load=images,genres,productionCountries
 
 def load():
     logger.info("Load %s" % SITE_NAME)
+    xbmcgui.Window(10000).clearProperty('xstream.moflix-stream.lastSearchText')
     params = ParameterHandler()
     params.setParam('page', (1))
     params.setParam('sUrl', URL_VALUE % 'now-playing')
@@ -52,53 +54,51 @@ def load():
     cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30502), SITE_IDENTIFIER, 'showEntries'), params)  # Movies
     params.setParam('sUrl', URL_VALUE % 'top-rated-movies')
     cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30509), SITE_IDENTIFIER, 'showEntries'), params)  # Top Movies
+    cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30543), SITE_IDENTIFIER, 'showCollections'), params)  # Collections
     params.setParam('sUrl', URL_VALUE % 'series')
     cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30511), SITE_IDENTIFIER, 'showEntries'), params)  # Series
-    cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30543), SITE_IDENTIFIER, 'showCollections'), params)  # Collections
     cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30520), SITE_IDENTIFIER, 'showSearch'), params)  # Search
     cGui().setEndOfDirectory()
 
 
 def showCollections():
     params = ParameterHandler()
-    params.setParam('sUrl', URL_VALUE % 'the-american-pie-collection')
-    cGui().addFolder(cGuiElement('American Pie Complete Collection', SITE_IDENTIFIER, 'showEntries'), params)
-    params.setParam('sUrl', URL_VALUE % 'bud-spencer-terence-hill-collection')
-    cGui().addFolder(cGuiElement('Bud Spencer & Terence Hill Collection', SITE_IDENTIFIER, 'showEntries'), params)
-    params.setParam('sUrl', URL_VALUE % 'the-dc-universum-collection')
-    cGui().addFolder(cGuiElement('DC Superhelden Collection', SITE_IDENTIFIER, 'showEntries'), params)
-    params.setParam('sUrl', URL_VALUE % 'the-mission-impossible-collection')
-    cGui().addFolder(cGuiElement('Ethan Hunt Collection', SITE_IDENTIFIER, 'showEntries'), params)
-    params.setParam('sUrl', URL_VALUE % 'fast-furious-movie-collection')
-    cGui().addFolder(cGuiElement('Fast & Furious Collection', SITE_IDENTIFIER, 'showEntries'), params)
-    params.setParam('sUrl', URL_VALUE % 'halloween-movie-collection')
-    cGui().addFolder(cGuiElement('Halloween Movie Collection', SITE_IDENTIFIER, 'showEntries'), params)
-    params.setParam('sUrl', URL_VALUE % 'der-herr-der-ringe-collection')
-    cGui().addFolder(cGuiElement('Herr der Ringe Collection', SITE_IDENTIFIER, 'showEntries'), params)
-    params.setParam('sUrl', URL_VALUE % 'the-james-bond-collection')
-    cGui().addFolder(cGuiElement('James Bond Collection', SITE_IDENTIFIER, 'showEntries'), params)
-    params.setParam('sUrl', URL_VALUE % 'the-jason-bourne-collection')
-    cGui().addFolder(cGuiElement('Jason Bourne Collection', SITE_IDENTIFIER, 'showEntries'), params)
-    params.setParam('sUrl', URL_VALUE % 'the-jurassic-park-collection')
-    cGui().addFolder(cGuiElement('Jurassic Park Collection', SITE_IDENTIFIER, 'showEntries'), params)
-    params.setParam('sUrl', URL_VALUE % 'top-kids-liste')
-    cGui().addFolder(cGuiElement('Kinder & Familienfilme', SITE_IDENTIFIER, 'showEntries'), params)
-    params.setParam('sUrl', URL_VALUE % 'the-marvel-cinematic-universe-collection')
-    cGui().addFolder(cGuiElement('Marvel Cinematic Universe Collection', SITE_IDENTIFIER, 'showEntries'), params)
-    params.setParam('sUrl', URL_VALUE % 'the-olsenbande-collection')
-    cGui().addFolder(cGuiElement('Olsenbande Collection', SITE_IDENTIFIER, 'showEntries'), params)
-    params.setParam('sUrl', URL_VALUE % 'the-planet-der-affen-collection')
-    cGui().addFolder(cGuiElement('Planet der Affen Collection', SITE_IDENTIFIER, 'showEntries'), params)
-    params.setParam('sUrl', URL_VALUE % 'rocky-the-knockout-collection')
-    cGui().addFolder(cGuiElement('Rocky - The Knockout Collection', SITE_IDENTIFIER, 'showEntries'), params)
-    params.setParam('sUrl', URL_VALUE % 'the-star-trek-movies-collection')
-    cGui().addFolder(cGuiElement('Star Trek Kinofilm Collection', SITE_IDENTIFIER, 'showEntries'), params)
-    params.setParam('sUrl', URL_VALUE % 'the-star-wars-collection')
-    cGui().addFolder(cGuiElement('Star Wars Collection', SITE_IDENTIFIER, 'showEntries'), params)
-    params.setParam('sUrl', URL_VALUE % 'stirb-langsam-collection')
-    cGui().addFolder(cGuiElement('Stirb Langsam Collection', SITE_IDENTIFIER, 'showEntries'), params)
-    params.setParam('sUrl', URL_VALUE % 'x-men-collection')
-    cGui().addFolder(cGuiElement('X-Men Collection', SITE_IDENTIFIER, 'showEntries'), params)
+    params.setParam('isCollection', 'True')
+    collections = [
+        {'name': 'American Pie', 'slug': 'the-american-pie-collection'},
+        {'name': 'Bud Spencer & Terence Hill', 'slug': 'bud-spencer-terence-hill-collection'},
+        {'name': 'DC', 'slug': 'the-dc-universum-collection'},
+        {'name': 'Marvel', 'slug': 'the-marvel-cinematic-universe-collection'},
+        {'name': 'Mission Impossible', 'slug': 'the-mission-impossible-collection'},
+        {'name': 'Fast & Furious', 'slug': 'fast-furious-movie-collection'},
+        {'name': 'Halloween', 'slug': 'halloween-movie-collection'},
+        {'name': 'Herr der Ringe', 'slug': 'der-herr-der-ringe-collection'},
+        {'name': 'James Bond', 'slug': 'the-james-bond-collection'},
+        {'name': 'Jason Bourne', 'slug': 'the-jason-bourne-collection'},
+        {'name': 'Jurassic Park', 'slug': 'the-jurassic-park-collection'},
+        {'name': 'Kinder & Familienfilme', 'slug': 'top-kids-liste'},
+        {'name': 'Planet der Affen', 'slug': 'the-planet-der-affen-collection'},
+        {'name': 'Rocky', 'slug': 'rocky-the-knockout-collection'},
+        {'name': 'Star Trek', 'slug': 'the-star-trek-movies-collection'},
+        {'name': 'Star Wars', 'slug': 'the-star-wars-collection'},
+        {'name': 'Stirb Langsam', 'slug': 'stirb-langsam-collection'},
+        {'name': 'X-Men', 'slug': 'x-men-collection'},
+        {'name': 'Winnetou', 'slug': 'winnetou-old-shatterhand-die-karl-may-saga'},
+        {'name': 'Harry Potter', 'slug': 'harry-potter-collection'},
+        {'name': 'Nightmare on Elm Street', 'slug': 'a-nightmare-on-elm-street-collection'},
+        {'name': 'Ice Age', 'slug': 'ice-age-die-komplette-urzeit-saga'},
+        {'name': 'Olsenbande', 'slug': 'die-olsenbande-collection'},
+        {'name': 'Scream', 'slug': 'dein-albtraum-beginnt-hier-die-scream-collection'},
+        {'name': 'Wrong Turn – Die Pfade des Grauens', 'slug': 'wrong-turn'},
+        {'name': 'Transformers', 'slug': 'transformers-die-saga-der-maschinen'},
+        {'name': 'Die glorreichen Sieben – Outlaws & Ehre', 'slug': 'die-glorreichen-sieben'},
+        {'name': 'Saw', 'slug': 'saw-die-jigsaw-collection'},
+        {'name': 'Kinder und Familie', 'slug': 'top-kids-liste'},
+    ]
+    sorted_collections = sorted(collections, key=lambda x: x['name'])
+    for coll in sorted_collections:
+        params.setParam('sUrl', URL_VALUE % coll['slug'])
+        cGui().addFolder(cGuiElement(coll['name'], SITE_IDENTIFIER, 'showEntries'), params)
     cGui().setEndOfDirectory()
 
 
@@ -116,6 +116,8 @@ def showEntries(entryUrl=False, sGui=False):
     jSearch = json.loads(oRequest.request())  # Lade JSON aus dem Request der URL
     if not jSearch: return  # Wenn Suche erfolglos - Abbruch
     aResults = jSearch['channel']['content']['data']
+    if params.getValue('isCollection') != 'True' and entryUrl != URL_VALUE % 'now-playing':
+        aResults = sorted(aResults, key=lambda x: x['name'].lower())  # Sort alphabetically by name (case-insensitive)
     total = len(aResults)
     if len(aResults) == 0:
         if not sGui: oGui.showInfo()
@@ -183,7 +185,7 @@ def showSeasons(sGui=False):
     for i in aResults:
         sId = str(i['title_id']) # ID ändert sich !!!
         sSeasonNr = str(i['number']) # Staffel Nummer
-        oGuiElement = cGuiElement('Staffel ' + sSeasonNr, SITE_IDENTIFIER, 'showEpisodes')
+        oGuiElement = cGuiElement(cConfig().getLocalizedString(30512) + ' ' + sSeasonNr, SITE_IDENTIFIER, 'showEpisodes')
         oGuiElement.setMediaType('season')
         oGuiElement.setSeason(sSeasonNr)
         oGuiElement.setThumbnail(sThumbnail)
@@ -226,7 +228,7 @@ def showEpisodes(sGui=False):
         sName = str(i['name']) # Episoden Titel
         sEpisodeNr = str(i['episode_number']) # Episoden Nummer
         sThumbnail = str(i['poster']) # Episoden Poster
-        oGuiElement = cGuiElement('Episode ' + sEpisodeNr + ' - ' + sName, SITE_IDENTIFIER, 'showHosters')
+        oGuiElement = cGuiElement(cConfig().getLocalizedString(30513) + ' ' + sEpisodeNr + ' - ' + sName, SITE_IDENTIFIER, 'showHosters')
         if 'description' in i and i['description'] != '': oGuiElement.setDescription(i['description']) # Suche nach Desc wenn nicht leer dann setze GuiElement
         oGuiElement.setEpisode(sEpisodeNr)
         oGuiElement.setSeason(sSeasonNr)
@@ -253,6 +255,7 @@ def showSearchEntries(entryUrl=False, sGui=False, sSearchText=''):
     jSearch = json.loads(oRequest.request()) # Lade JSON aus dem Request der URL
     if not jSearch: return  # Wenn Suche erfolglos - Abbruch
     aResults = jSearch['results'] # Ausgabe der Suchresultate von jSearch
+    aResults = sorted(aResults, key=lambda x: x['name'].lower())  # Sort alphabetically by name (case-insensitive)
     total = len(aResults) # Anzahl aller Ergebnisse
     if len(aResults) == 0: # Wenn Resultate 0 zeige Benachrichtigung
         if not sGui: oGui.showInfo()
@@ -332,8 +335,13 @@ def getHosterUrl(sUrl=False):
 
 
 def showSearch():
-    sSearchText = cGui().showKeyBoard(sHeading=cConfig().getLocalizedString(30281))
-    if not sSearchText: return
+    # Check if we have a cached search text (e.g. coming back from playback)
+    win = xbmcgui.Window(10000)
+    sSearchText = win.getProperty('xstream.moflix-stream.lastSearchText')
+    if not sSearchText:
+        sSearchText = cGui().showKeyBoard(sHeading=cConfig().getLocalizedString(30281))
+        if not sSearchText: return
+        win.setProperty('xstream.moflix-stream.lastSearchText', sSearchText)
     _search(False, sSearchText)
     cGui().setEndOfDirectory()
 

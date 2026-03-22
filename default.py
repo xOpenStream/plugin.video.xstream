@@ -4,25 +4,41 @@
 def main():
     from xstream import parseUrl
     from os.path import join
-    from sys import path
+    import sys
     import platform
+    import os
 
     from resources.lib.config import cConfig
     from xbmc import LOGINFO as LOGNOTICE, log
     from xbmcvfs import translatePath
 
     _addonPath_ = translatePath(cConfig().getAddonInfo('path'))
-    path.append(join(_addonPath_, 'resources', 'lib'))
-    path.append(join(_addonPath_, 'resources', 'lib', 'gui'))
-    path.append(join(_addonPath_, 'resources', 'lib', 'handler'))
-    path.append(join(_addonPath_, 'resources', 'art', 'sites'))
-    path.append(join(_addonPath_, 'resources', 'art'))
-    path.append(join(_addonPath_, 'sites'))    
+    sys.path.append(join(_addonPath_, 'resources', 'lib'))
+    sys.path.append(join(_addonPath_, 'resources', 'lib', 'gui'))
+    sys.path.append(join(_addonPath_, 'resources', 'lib', 'handler'))
+    sys.path.append(join(_addonPath_, 'resources', 'art', 'sites'))
+    sys.path.append(join(_addonPath_, 'resources', 'art'))
+    sys.path.append(join(_addonPath_, 'sites'))    
     
     LOGMESSAGE = cConfig().getLocalizedString(30166)
     log('-----------------------------------------------------------------------', LOGNOTICE)
     log(LOGMESSAGE + ' -> [default]: Start xStream Log, Version %s ' % cConfig().getAddonInfo('version'), LOGNOTICE)
     log(LOGMESSAGE + ' -> [default]: Python-Version: %s' % platform.python_version(), LOGNOTICE)
+
+    # RunScript handler for changelog button in settings
+    if len(sys.argv) > 1 and sys.argv[1] == 'changelog':
+        import xbmcgui
+        changelog_path = os.path.join(_addonPath_, 'changelog.txt')
+        if not os.path.isfile(changelog_path):
+            xbmcgui.Dialog().notification(cConfig().getAddonInfo('name'), cConfig().getLocalizedString(30822), xbmcgui.NOTIFICATION_INFO, 5000)
+            return
+        with open(changelog_path, 'r', encoding='utf-8') as f:
+            text = f.read()
+        if not text.strip():
+            xbmcgui.Dialog().notification(cConfig().getAddonInfo('name'), cConfig().getLocalizedString(30821), xbmcgui.NOTIFICATION_INFO, 5000)
+        else:
+            xbmcgui.Dialog().textviewer('Changelog', text)
+        return
 
     try:
         parseUrl()

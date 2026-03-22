@@ -2,17 +2,18 @@
 # Python 3
 
 # Always pay attention to the translations in the menu!
-# Sprachauswahl für Hoster enthalten.
-# Ajax Suchfunktion enthalten.
-# HTML LangzeitCache hinzugefügt
-# showValue:     24 Stunden
-# showAllSeries: 24 Stunden
-# showEpisodes:   4 Stunden
-# SSsearch:      24 Stunden
+# Language selection for hosters included.
+# Ajax search function included.
+# HTML long-term cache added
+# showValue:     24 hours
+# showAllSeries: 24 hours
+# showEpisodes:   4 hours
+# SSsearch:      24 hours
     
-# 2022-12-06 Heptamer - Suchfunktion überarbeitet
-# 2026-12-29 viewIT   - Hotfix wegen V2 von Serienstream
-# 2026-02-02 SatBandit   - Hotfix wegen V2 von Serienstream 
+# 2022-12-06 Heptamer - Search function reworked
+# 2026-12-29 viewIT   - Hotfix for V2 of SerienStream
+# 2026-02-02 SatBandit - Hotfix for V2 of SerienStream
+import ast
 import xbmcgui
 import string  # MERGED: Required for A-Z loop
 import re
@@ -35,13 +36,13 @@ if cConfig().getSetting('global_search_' + SITE_IDENTIFIER) == 'false':
     SITE_GLOBAL_SEARCH = False
     logger.info('-> [SitePlugin]: globalSearch for %s is deactivated.' % SITE_NAME)
 
-# Domain Abfrage
-DOMAIN = cConfig().getSetting('plugin_' + SITE_IDENTIFIER + '.domain') # Domain Auswahl über die xStream Einstellungen möglich
-STATUS = cConfig().getSetting('plugin_' + SITE_IDENTIFIER + '_status') # Status Code Abfrage der Domain
-ACTIVE = cConfig().getSetting('plugin_' + SITE_IDENTIFIER) # Ob Plugin aktiviert ist oder nicht
+# Domain query
+DOMAIN = cConfig().getSetting('plugin_' + SITE_IDENTIFIER + '.domain') # Domain selection via addon settings
+STATUS = cConfig().getSetting('plugin_' + SITE_IDENTIFIER + '_status') # Domain status code query
+ACTIVE = cConfig().getSetting('plugin_' + SITE_IDENTIFIER) # Whether plugin is active or not
 
 # URL_MAIN = 'https://s.to/'
-if DOMAIN == '186.2.175.5': # Bei Proxy Änderung nur IP hier in den Settings und in Zeile 53 tauschen.
+if DOMAIN == '186.2.175.5': # For proxy change, update IP here and in settings
     URL_MAIN = 'http://' + DOMAIN
     REFERER = 'http://' + DOMAIN
     proxy = 'true'
@@ -56,7 +57,7 @@ URL_POPULAR = URL_MAIN + '/beliebte-serien'
 URL_LOGIN = URL_MAIN + '/login'
 URL_SEARCH = URL_MAIN + '/suche?term='
 
-# Wenn DNS Bypass aktiv nutze Proxy Server
+# If DNS bypass active, use proxy server
 if cConfig().getSetting('bypassDNSlock') == 'true':
     cConfig().setSetting('plugin_' + SITE_IDENTIFIER + '.domain', '186.2.175.5')
 
@@ -64,45 +65,34 @@ if cConfig().getSetting('bypassDNSlock') == 'true':
 
 def load(): # Menu structure of the site plugin
     logger.info('Load %s' % SITE_NAME)
+    xbmcgui.Window(10000).clearProperty('xstream.serienstream.lastSearchText')
     params = ParameterHandler()
     username = cConfig().getSetting('serienstream.user')# Username
     password = cConfig().getSetting('serienstream.pass')# Password
     if username == '' or password == '':                # If no username and password were set, close the plugin!
         xbmcgui.Dialog().ok(cConfig().getLocalizedString(30241), cConfig().getLocalizedString(30264))   # Info Dialog!
     else:
-        params.setParam('sUrl', URL_SERIES)
-        cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30518), SITE_IDENTIFIER, 'showAllSeries'), params)# All Series
-        # --- MERGED: A-Z Menu ---
+        # Neues (Submenü)
         params = ParameterHandler()
-        params.setParam('sUrl', URL_SERIES + "?by=alpha")
-        cGui().addFolder(cGuiElement("A-Z", SITE_IDENTIFIER, 'showGenericMenu'), params)
+        cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30554), SITE_IDENTIFIER, 'showNeues'), params)
+        # Trends (Submenü)
+        params = ParameterHandler()
+        params.setParam('sUrl', URL_MAIN)
+        cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30555), SITE_IDENTIFIER, 'showTrends'), params)
+        # Genre
         params = ParameterHandler()
         params.setParam('sUrl', URL_SERIES + "?by=genre")
-        cGui().addFolder(cGuiElement("Genre", SITE_IDENTIFIER, 'showGenericMenu'), params)
-        # ------------------------
-        params.setParam('sUrl', URL_NEW_SERIES)
-        # HOTFIX-BROKEN Function: New Series
-        # cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30514), SITE_IDENTIFIER, 'showEntries'), params)
-        params = ParameterHandler() # Neu initialisieren!
-        params.setParam('sUrl', URL_POPULAR)
-        # params.setParam('sectionName', 'Neue Staffeln diese Woche')
-        cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30516), SITE_IDENTIFIER, 'showRoot'), params)
-        params = ParameterHandler() # Neu initialisieren!
-        params.setParam('sectionName', 'Meistgesehen gerade')
-        params.setParam('sUrl', URL_POPULAR)
-        cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30519), SITE_IDENTIFIER, 'showBeliebte'), params)  # Popular Series
-        params.setParam('sUrl', URL_MAIN)
-        params.setParam('sCont', 'catalogNav')
-        # HOTFIX-BROKEN Function: From A-Z
-        # cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30517), SITE_IDENTIFIER, 'showValue'), params)
-        params.setParam('sCont', 'homeContentGenresList')
-        # HOTFIX-BROKEN Function: Genre
-        # cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30506), SITE_IDENTIFIER, 'showValue'), params)
+        cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30506), SITE_IDENTIFIER, 'showGenericMenu'), params)
+        # A-Z (Submenü)
+        params = ParameterHandler()
+        cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30814), SITE_IDENTIFIER, 'showAZMenu'), params)
+        # Suche
+        params = ParameterHandler()
         params.setParam('sUrl', URL_SEARCH)
-        cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30520), SITE_IDENTIFIER, 'showSearch'), params)   # Search
+        cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30520), SITE_IDENTIFIER, 'showSearch'), params)
         cGui().setEndOfDirectory()
 
-import xbmc # Wichtig für das Logging
+import xbmc # Required for logging
 
 def showCatalog():
     params = ParameterHandler()
@@ -147,7 +137,7 @@ def showCatalog():
         # Erst schauen wir im Dictionary nach (Genre-Modus Vorteil)
         sThumb = dictThumbs.get(sSeriesName, "")
 
-        # Fallback für A-Z Modus (Deine Fenster-Logik für maximale Sicherheit)
+        # Fallback for A-Z mode (window logic for safety)
         if not sThumb and not sTargetGenre:
             thumb_match = re.search(r'href="' + re.escape(sLink) + r'"[\s\S]*?(?:data-src|src)="([^"]+)"', sContent)
             if thumb_match:
@@ -162,7 +152,7 @@ def showCatalog():
         p.setParam('sName', sSeriesName)
         oGui.addFolder(oGuiElement, p)
 
-    # 3. Paginierung (unverändert)
+    # 3. Pagination (unchanged)
     if not sTargetGenre:
         match_next = re.search(r'href="([^"]+)"[^>]*rel="next"', sHtmlContent)
         if match_next:
@@ -172,7 +162,7 @@ def showCatalog():
             p_next = ParameterHandler()
             p_next.setParam('sUrl', next_url)
             p_next.setParam('sName', params.getValue('sName'))
-            oGui.addFolder(cGuiElement(">>> Nächste Seite", SITE_IDENTIFIER, 'showCatalog'), p_next)
+            oGui.addFolder(cGuiElement(cConfig().getLocalizedString(30558), SITE_IDENTIFIER, 'showCatalog'), p_next)
 
     oGui.setEndOfDirectory()
             
@@ -184,7 +174,7 @@ def showGenericMenu():
     oGui = cGui()
 
     if 'by=genre' in sUrl:
-        # Sucht die h3 Überschriften
+        # Search for h3 headings
         pattern = r'<h3[^>]*class="[^"]*h5[^"]*"[^>]*>([^<]+)</h3>'
         results = re.findall(pattern, sHtmlContent)
         
@@ -196,7 +186,7 @@ def showGenericMenu():
             p = ParameterHandler()
             p.setParam('sUrl', sUrl)
             p.setParam('sName', sDisplay) # "Action"
-            p.setParam('sGenreFilter', sName) # "filter.genre_action" für die Suche im HTML
+            p.setParam('sGenreFilter', sName) # "filter.genre_action" for HTML search
             oGui.addFolder(cGuiElement(sDisplay, SITE_IDENTIFIER, 'showCatalog'), p)
     else:
         # A-Z Logik (bleibt wie gehabt)
@@ -220,7 +210,7 @@ def showValue():
     sHtmlContent = oRequest.request()
     isMatch, sContainer = cParser.parseSingleResult(sHtmlContent, '<ul[^>]*class="%s"[^>]*>(.*?)<\\/ul>' % params.getValue('sCont'))
     if isMatch:
-        isMatch, aResult = cParser.parse(sContainer, '<li>\s*<a[^>]*href="([^"]*)"[^>]*>(.*?)<\\/a>\s*<\\/li>')
+        isMatch, aResult = cParser.parse(sContainer, r'<li>\s*<a[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>\s*<\/li>')
     if not isMatch:
         cGui().showInfo()
         return
@@ -266,11 +256,11 @@ def showAllSeries(entryUrl=False, sGui=False, sSearchText=False):
 
 # Hilfsfunktion: Extrahiert alle Cards aus einem HTML-Block
 def extractCards(sHtml):
-    # s.to nutzt für die Bilder 'data-src' (Lazy Load)
+    # s.to uses 'data-src' for images (lazy load)
     # Das Pattern sucht den Link, das Bild und den Namen
     pattern = r'href="([^"]+)"[^>]*class="show-card[^"]*".*?data-src="([^"]+)"[^>]*alt="([^"]+)"'
     
-    # (?s) erlaubt Zeilenumbrüche innerhalb einer Card
+    # (?s) allows line breaks within a card
     return re.findall(r'(?s)' + pattern, sHtml)
 
 def showGenericSeriesList(entryUrl=False):
@@ -282,9 +272,7 @@ def showGenericSeriesList(entryUrl=False):
     
     oRequest = cRequestHandler(sUrl)
     sHtmlContent = oRequest.request()
-    dump_to_file(sHtmlContent, 'beliebte.html')
-
-    # HTML "säubern": Alle Whitespaces/Newlines zu einem Leerzeichen
+    # Clean HTML: collapse all whitespace/newlines to single space
     sHtmlContent = re.sub(r'\s+', ' ', sHtmlContent)
 
     if sectionName and sectionName in sHtmlContent:
@@ -292,8 +280,8 @@ def showGenericSeriesList(entryUrl=False):
         sHtmlContent = sHtmlContent.split(sectionName, 1)[1]
         
         # Ende: Wir suchen das Ende der Liste. 
-        # S.to schließt Grids oft mit </ul> oder </section> ab.
-        # Ein sehr sicherer Anker ist das nächste <h2 (die nächste Rubrik).
+        # S.to often closes grids with </ul> or </section>
+        # A safe anchor is the next <h2 (next section heading)
         if '<h2' in sHtmlContent:
             sHtmlContent = sHtmlContent.split('<h2', 1)[0]
         elif '</section>' in sHtmlContent:
@@ -319,7 +307,7 @@ def showGenericSeriesList(entryUrl=False):
         oGuiElement.setThumbnail(sThumbnail)
         oGuiElement.setMediaType('tvshow')
         
-        # Wichtig: Neue Parameter-Instanz für jeden Folder!
+        # Important: New parameter instance for each folder!
         p = ParameterHandler()
         p.setParam('sUrl', sUrl)
         p.setParam('sName', sName)
@@ -329,19 +317,175 @@ def showGenericSeriesList(entryUrl=False):
     oGui.setView('tvshows')
     oGui.setEndOfDirectory() 
 
-def showRoot():
+def showNeues():
+    """Submenü 'Neues' mit Neue Serien und Neuste Episoden."""
+    oGui = cGui()
+    # Neue Serien
+    params = ParameterHandler()
+    params.setParam('sUrl', URL_NEW_SERIES)
+    oGui.addFolder(cGuiElement(cConfig().getLocalizedString(30514), SITE_IDENTIFIER, 'showNewSeries'), params)
+    # Neuste Staffel diese Woche (aus Beliebte Serien Seite)
+    params = ParameterHandler()
+    oGui.addFolder(cGuiElement(cConfig().getLocalizedString(30556), SITE_IDENTIFIER, 'showNeusteStaffel'), params)
+    # Neuste Episoden
+    params = ParameterHandler()
+    oGui.addFolder(cGuiElement(cConfig().getLocalizedString(30557), SITE_IDENTIFIER, 'showNeusteEpisoden'), params)
+    oGui.setEndOfDirectory()
+
+def showNeusteStaffel():
+    """Zeigt 'Neuste Staffel diese Woche' von der Beliebte-Serien-Seite."""
+    oGui = cGui()
+    sHtmlContent = cRequestHandler(URL_POPULAR, caching=True).request()
+    if not sHtmlContent: return
+    sHtmlContent = re.sub(r'\s+', ' ', sHtmlContent)
+
+    # Alle H2/H3-Überschriften durchsuchen - flexibel nach "Staffel" + "Woche" matchen
+    titles = re.findall(r'<(?:h2|h3)[^>]*>(.*?)</(?:h2|h3)>', sHtmlContent)
+    sTargetTitle = None
+    for sTitle in titles:
+        sClean = re.sub(r'<[^>]*>', '', sTitle).strip()
+        sClean = ''.join(c for c in sClean if ord(c) < 128).strip()
+        if 'staffel' in sClean.lower() and 'woche' in sClean.lower():
+            sTargetTitle = sClean
+            break
+
+    if not sTargetTitle:
+        oGui.showInfo()
+        return
+
+    # Sektion extrahieren (gleiche Logik wie showSectionContent)
+    find_section = r'<(?:h2|h3)[^>]*>[^<]*' + re.escape(sTargetTitle) + r'.*?</(?:h2|h3)>(.*?)(?=<h2|<h3|$)'
+    match = re.search(find_section, sHtmlContent)
+
+    if match:
+        sFragment = match.group(1)
+        pattern = r'href="(/serie/[^"]+)".*?<img.*?(?:data-src|src)="([^"]+)".*?alt="([^"]+)"'
+        items = re.findall(pattern, sFragment)
+
+        seen_links = set()
+        for sLink, sThumb, sName in items:
+            sName = unescape(sName).strip()
+            sSeriesLink = sLink.split('/staffel-')[0]
+            if sSeriesLink in seen_links: continue
+            seen_links.add(sSeriesLink)
+            if 'data:image/gif' in sThumb: continue
+
+            oGuiElement = cGuiElement(sName, SITE_IDENTIFIER, 'showSeasons')
+            if sThumb.startswith('/'): sThumb = URL_MAIN + sThumb
+            oGuiElement.setThumbnail(sThumb)
+
+            p = ParameterHandler()
+            p.setParam('sUrl', URL_MAIN + sSeriesLink)
+            p.setParam('sName', sName)
+            p.setParam('sThumbnail', sThumb)
+            oGui.addFolder(oGuiElement, p)
+
+    oGui.setEndOfDirectory()
+
+def showMeistgesehen():
+    """Zeigt 'Meistgesehen gerade' von der Beliebte-Serien-Seite."""
+    oGui = cGui()
+    sHtmlContent = cRequestHandler(URL_POPULAR, caching=True).request()
+    if not sHtmlContent: return
+    sHtmlContent = re.sub(r'\s+', ' ', sHtmlContent)
+
+    # Alle H2/H3-Überschriften durchsuchen - flexibel nach "meistgesehen" matchen
+    titles = re.findall(r'<(?:h2|h3)[^>]*>(.*?)</(?:h2|h3)>', sHtmlContent)
+    sTargetTitle = None
+    for sTitle in titles:
+        sClean = re.sub(r'<[^>]*>', '', sTitle).strip()
+        sClean = ''.join(c for c in sClean if ord(c) < 128).strip()
+        if 'meistgesehen' in sClean.lower():
+            sTargetTitle = sClean
+            break
+
+    if not sTargetTitle:
+        oGui.showInfo()
+        return
+
+    # Sektion extrahieren (gleiche Logik wie showSectionContent)
+    find_section = r'<(?:h2|h3)[^>]*>[^<]*' + re.escape(sTargetTitle) + r'.*?</(?:h2|h3)>(.*?)(?=<h2|<h3|$)'
+    match = re.search(find_section, sHtmlContent)
+
+    if match:
+        sFragment = match.group(1)
+        pattern = r'href="(/serie/[^"]+)".*?<img.*?(?:data-src|src)="([^"]+)".*?alt="([^"]+)"'
+        items = re.findall(pattern, sFragment)
+
+        seen_links = set()
+        for sLink, sThumb, sName in items:
+            sName = unescape(sName).strip()
+            sSeriesLink = sLink.split('/staffel-')[0]
+            if sSeriesLink in seen_links: continue
+            seen_links.add(sSeriesLink)
+            if 'data:image/gif' in sThumb: continue
+
+            oGuiElement = cGuiElement(sName, SITE_IDENTIFIER, 'showSeasons')
+            if sThumb.startswith('/'): sThumb = URL_MAIN + sThumb
+            oGuiElement.setThumbnail(sThumb)
+
+            p = ParameterHandler()
+            p.setParam('sUrl', URL_MAIN + sSeriesLink)
+            p.setParam('sName', sName)
+            p.setParam('sThumbnail', sThumb)
+            oGui.addFolder(oGuiElement, p)
+
+    oGui.setEndOfDirectory()
+
+def showNeusteEpisoden():
+    """Zeigt die neusten Episoden direkt von der Homepage."""
     oGui = cGui()
     sHtmlContent = cRequestHandler(URL_MAIN, caching=True).request()
-    
+    if not sHtmlContent:
+        oGui.showInfo()
+        return
+
+    sHtmlContent = re.sub(r'\s+', ' ', sHtmlContent)
+
+    # Finde die Sektion mit den neuesten Episoden
+    pattern = r'data-bs-target="#([^"]+)"[^>]*>([^<]+)</button>'
+    sections = re.findall(pattern, sHtmlContent)
+
+    episode_section_id = None
+    for sId, sName in sections:
+        sName = sName.strip()
+        if 'pisod' in sName.lower() or 'folge' in sName.lower():
+            episode_section_id = sId
+            break
+
+    # Fallback: erste section-0
+    if not episode_section_id:
+        episode_section_id = 'section-0'
+
+    # Sektion extrahieren
+    section_pattern = f'id="{episode_section_id}".*?(?:id="section-|</div> </div> </section>)'
+    section_match = re.search(section_pattern, sHtmlContent)
+
+    if section_match:
+        fragment = section_match.group(0)
+        if 'latest-episode-row' in fragment:
+            renderEpisodes(oGui, fragment)
+        else:
+            renderCards(oGui, fragment)
+
+    oGui.setView('tvshows')
+    oGui.setEndOfDirectory()
+
+def showTrends():
+    """Submenü 'Trends' - Homepage-Sektionen (ohne Episoden) + Beliebte Serien."""
+    oGui = cGui()
+    sHtmlContent = cRequestHandler(URL_MAIN, caching=True).request()
+
     if sHtmlContent:
-        # Suche alle Buttons: data-bs-target="#section-0">Neueste Episoden</button>
         pattern = r'data-bs-target="#([^"]+)"[^>]*>([^<]+)</button>'
         sections = re.findall(pattern, sHtmlContent)
 
         seen_ids = set()
         for sId, sName in sections:
             sName = sName.strip()
-            # Nur hinzufügen, wenn wir diese Sektion (id) noch nicht im Menü haben
+            # Episoden-Sektion überspringen (die ist jetzt in "Neues")
+            if 'pisod' in sName.lower() or 'folge' in sName.lower():
+                continue
             if sId not in seen_ids and "section-" in sId:
                 oGuiElement = cGuiElement(sName, SITE_IDENTIFIER, 'showHomeSection')
                 p = ParameterHandler()
@@ -349,10 +493,97 @@ def showRoot():
                 p.setParam('sName', sName)
                 oGui.addFolder(oGuiElement, p)
                 seen_ids.add(sId)
-    
-    oGui.addFolder(cGuiElement('Suche', SITE_IDENTIFIER, 'showSearch'), ParameterHandler())
+
+    # Meistgesehen gerade (von der Beliebte-Serien-Seite)
+    params = ParameterHandler()
+    oGui.addFolder(cGuiElement(cConfig().getLocalizedString(30560), SITE_IDENTIFIER, 'showMeistgesehen'), params)
+
+    # Beliebte Genres als Eintrag im Trends-Menü
+    params = ParameterHandler()
+    params.setParam('sUrl', URL_POPULAR)
+    oGui.addFolder(cGuiElement(cConfig().getLocalizedString(30817), SITE_IDENTIFIER, 'showBeliebte'), params)
+
+    oGui.setEndOfDirectory()
+
+def showAZMenu():
+    """Submenü A-Z mit Alle Serien und alphabetischer Sortierung."""
+    oGui = cGui()
+    # Alle Serien
+    params = ParameterHandler()
+    params.setParam('sUrl', URL_SERIES)
+    oGui.addFolder(cGuiElement(cConfig().getLocalizedString(30518), SITE_IDENTIFIER, 'showAllSeries'), params)
+    # A-Z
+    params = ParameterHandler()
+    params.setParam('sUrl', URL_SERIES + "?by=alpha")
+    oGui.addFolder(cGuiElement(cConfig().getLocalizedString(30814), SITE_IDENTIFIER, 'showGenericMenu'), params)
     oGui.setEndOfDirectory()
     
+def showNewSeries():
+    """
+    Zeigt die 'Neu auf S.to' Kacheln von der Homepage.
+    Sektion: class="new-shows-slider"
+    Bilder nutzen <img src="..."> (kein data-src!)
+    """
+    oGui = cGui()
+
+    sHtmlContent = cRequestHandler(URL_MAIN, caching=True).request()
+    if not sHtmlContent:
+        oGui.showInfo()
+        return
+
+    sHtml = re.sub(r'\s+', ' ', sHtmlContent)
+
+    # Sektion isolieren
+    match_section = re.search(r'class="[^"]*new-shows-slider[^"]*"(.*?)</section>', sHtml, re.DOTALL)
+    if not match_section:
+        logger.error('[%s] showNewSeries: new-shows-slider nicht gefunden' % SITE_IDENTIFIER)
+        oGui.showInfo()
+        return
+
+    fragment = match_section.group(1)
+
+    # Jede Karte einzeln parsen - verhindert Offset-Bug durch doppelte hrefs
+    cards = re.findall(r'<article[^>]*class="[^"]*continue-card[^"]*"[^>]*>(.*?)</article>', fragment, re.DOTALL)
+
+    seen  = set()
+    clean = []
+    for card in cards:
+        link_match  = re.search(r'href="(/serie/[^"]+)"', card)
+        img_match   = re.search(r'<img\s+src="([^"]+)"[^>]*alt="([^"]+)"', card)
+        if not link_match or not img_match: continue
+        sLink  = link_match.group(1)
+        sThumb = img_match.group(1)
+        sTitle = img_match.group(2)
+        if sLink in seen: continue
+        seen.add(sLink)
+        if 'data:image' in sThumb: continue
+        clean.append((sLink, sThumb, unescape(sTitle).strip()))
+
+    if not clean:
+        logger.error('[%s] showNewSeries: Keine Kacheln gefunden' % SITE_IDENTIFIER)
+        oGui.showInfo()
+        return
+
+    total = len(clean)
+    for sLink, sThumb, sTitle in clean:
+        sFullUrl   = URL_MAIN + sLink  if sLink.startswith('/') else sLink
+        sFullThumb = URL_MAIN + sThumb if sThumb.startswith('/') else sThumb
+        sFullThumb = sFullThumb.replace('format=webp', 'format=jpg').replace('format=avif', 'format=jpg')
+
+        oGuiElement = cGuiElement(sTitle, SITE_IDENTIFIER, 'showSeasons')
+        oGuiElement.setMediaType('tvshow')
+        oGuiElement.setThumbnail(sFullThumb)
+
+        p = ParameterHandler()
+        p.setParam('sUrl',       sFullUrl)
+        p.setParam('sName',      sTitle)
+        p.setParam('sThumbnail', sFullThumb)
+        oGui.addFolder(oGuiElement, p, True, total)
+
+    oGui.setView('tvshows')
+    oGui.setEndOfDirectory()
+
+
 def showHomeSection():
     params = ParameterHandler()
     section_id = params.getValue('section_id')
@@ -361,7 +592,7 @@ def showHomeSection():
     sHtmlContent = cRequestHandler(URL_MAIN, caching=True).request()
     if sHtmlContent:
         sHtmlContent = re.sub(r'\s+', ' ', sHtmlContent)
-        # Sucht ab der ID bis zur nächsten Sektion oder dem Ende des tab-content
+        # Search from ID to next section or end of tab-content
         section_pattern = f'id="{section_id}".*?(?:id="section-|</div> </div> </section>)'
         section_match = re.search(section_pattern, sHtmlContent)
         
@@ -386,13 +617,13 @@ def renderEpisodes(oGui, sHtml):
         if sLink.startswith('#'): continue
         
         sTitle = unescape(sTitle).strip()
-        # Sprache hübsch machen (german -> DE, english -> EN)
+        # Format language labels (german -> DE, english -> EN)
         sLangLabel = 'DE' if 'german' in sLang else 'EN' if 'english' in sLang else sLang.upper()
         
-        # Displayname inkl. Sprache für die Übersicht
+        # Display name including language for overview
         sDisplay = f"{sTitle} ({sSeason.strip()}{sEpisode.strip()}) [{sLangLabel}]"
         
-        # URL zur Staffel-Ebene säubern
+        # Clean URL to season level
         sCleanUrl = re.sub(r'/episode-\d+', '', sLink)
         sFullUrl = URL_MAIN + sCleanUrl if sCleanUrl.startswith('/') else sCleanUrl
         
@@ -417,11 +648,11 @@ def renderCards(oGui, sHtml):
     # 3. Den Titel (im h3-Tag oder title-Attribut)
     pattern = r'<img\s+data-src="([^"]+)"[^>]*>.*?<a\s+href="([^"]+)">\s*<h3\s+title="([^"]+)"'
     
-    # re.DOTALL ist wichtig, da zwischen Bild und Link viele Zeilenumbrüche liegen
+    # re.DOTALL needed due to line breaks between image and link
     results = re.findall(pattern, sHtml, re.DOTALL)
     
     for sThumb, sLink, sTitle in results:
-        # Falls die URL relativ ist, Haupt-URL davorhängen
+        # If URL is relative, prepend main URL
         sFullUrl = URL_MAIN + sLink if sLink.startswith('/') else sLink
         sTitle = unescape(sTitle).strip()
         
@@ -443,17 +674,23 @@ def showBeliebte(sGui=False):
     if not sHtmlContent: return
     sHtmlContent = re.sub(r'\s+', ' ', sHtmlContent)
 
-    # Wir suchen alle H2 und H3 Überschriften
+    # Find all H2 and H3 headings
     # Diese markieren den Start jeder Sektion
     titles = re.findall(r'<(?:h2|h3)[^>]*>(.*?)</(?:h2|h3)>', sHtmlContent)
 
     for sTitle in titles:
-        # HTML Tags entfernen (z.B. <span> oder  🥰)
+        # Remove HTML tags (e.g. <span> or emojis)
         sCleanTitle = re.sub(r'<[^>]*>', '', sTitle).strip()
-        # Sonderzeichen/Emojis radikal weg, damit der Match im Untermenü klappt
+        # Strip special chars/emojis for submenu matching
         sCleanTitle = ''.join(c for c in sCleanTitle if ord(c) < 128).strip()
         
         if not sCleanTitle or any(x in sCleanTitle for x in ['Kategorien', 'durchsuchen', 'Entdecken']):
+            continue
+        # "Neuste Staffel diese Woche" ist jetzt unter Neues
+        if 'staffel' in sCleanTitle.lower() and 'woche' in sCleanTitle.lower():
+            continue
+        # "Meistgesehen gerade" ist jetzt unter Trends
+        if 'meistgesehen' in sCleanTitle.lower():
             continue
 
         oGuiElement = cGuiElement(sCleanTitle, SITE_IDENTIFIER, 'showSectionContent')
@@ -472,13 +709,13 @@ def showSectionContent():
     if not sHtmlContent: return
     sHtmlContent = re.sub(r'\s+', ' ', sHtmlContent)
 
-    # Findet den Bereich von unserer Überschrift bis zur nächsten
+    # Find section from our heading to the next one
     find_section = r'<(?:h2|h3)[^>]*>[^<]*' + re.escape(sTargetTitle) + r'.*?</(?:h2|h3)>(.*?)(?=<h2|<h3|$)'
     match = re.search(find_section, sHtmlContent)
 
     if match:
         sFragment = match.group(1)
-        # Regex für Link, Thumbnail und Alt-Text
+        # Regex for link, thumbnail and alt text
         pattern = r'href="(/serie/[^"]+)".*?<img.*?(?:data-src|src)="([^"]+)".*?alt="([^"]+)"'
         items = re.findall(pattern, sFragment)
 
@@ -523,10 +760,10 @@ def extractPoster(sHtml):
         
     if match:
         sThumbnail = match.group(1).strip()
-        # Relative URLs vervollständigen
+        # Complete relative URLs
         if sThumbnail.startswith('/'):
             sThumbnail = URL_MAIN + sThumbnail
-        # Bildformate für Kodi optimieren (jpg statt webp/avif)
+        # Optimize image format for Kodi (jpg instead of webp/avif)
         sThumbnail = sThumbnail.replace('format=webp', 'format=jpg').replace('format=avif', 'format=jpg')
         
     return sThumbnail      
@@ -548,7 +785,7 @@ def showSeasons():
     elif not sName or sName == 'False':
         sName = "Serie"
 
-    # 2. Beschreibung (Präzise aus dem span "description-text" extrahieren)
+    # 2. Description (extract from span "description-text")
     sDesc = ''
     # Suche speziell nach dem span-Inhalt
     match_span = re.search(r'<span class="description-text">(.*?)</span>', sHtmlContent, re.DOTALL)
@@ -584,11 +821,11 @@ def showSeasons():
     for sSeasonNum in sorted_keys:
         sSeasonUrl = seasons_map[sSeasonNum]
         
-        # Fix für Filme statt Season 0 (Specials umbenannt)
+        # Fix for movies instead of Season 0 (renamed specials)
         if sSeasonNum == '0':
-            sDisplay = "Specials"
+            sDisplay = cConfig().getLocalizedString(30559)
         else:
-            sDisplay = "Staffel %s" % sSeasonNum
+            sDisplay = "%s %s" % (cConfig().getLocalizedString(30512), sSeasonNum)
         
         oGuiElement = cGuiElement(sDisplay, SITE_IDENTIFIER, 'showEpisodes')
         oGuiElement.setThumbnail(sThumbnail)
@@ -602,7 +839,7 @@ def showSeasons():
         p.setParam('sUrl', URL_MAIN + sSeasonUrl if sSeasonUrl.startswith('/') else sSeasonUrl)
         p.setParam('sName', sName)
         p.setParam('sThumbnail', sThumbnail)
-        # Die Beschreibung geben wir an die nächste Ebene weiter
+        # Pass description to next level
         p.setParam('sDescription', sDesc) 
         
         oGui.addFolder(oGuiElement, p)
@@ -618,7 +855,7 @@ def showEpisodes():
     sThumbnail = params.getValue('sThumbnail')
     sDesc = params.getValue('sDescription')
     
-    oRequest = cRequestHandler(sUrl)
+    oRequest = cRequestHandler(sUrl, caching=False)
     sHtmlContent = oRequest.request()
     if not sHtmlContent: return
 
@@ -635,27 +872,36 @@ def showEpisodes():
 
     if not sThumbnail: sThumbnail = extractPoster(sHtmlContent)
 		
-    # 2. Episoden-Tabelle parsen
-    # Wir suchen die Nummer (episode-number-cell) und den deutschen Titel (episode-title-ger)
-    # Und wir brauchen den Link zur Episode (den wir aus der Navigation oder den Zeilen holen)
-    
-    # Zuerst extrahieren wir die Zeilen oder Blöcke, um Links und Titel zu verknüpfen
-    # Da die Links in der Navigation oben stehen und die Titel unten in der Tabelle,
-    # ist es am stabilsten, die Tabelle für die Namen zu nutzen:
-    pattern = r'<th[^>]*>\s*(\d+)\s*</th>[\s\S]*?class="[^"]*episode-title-(?:ger|eng)"[^>]*>\s*([^<]+)\s*<'
-    titles_dict = dict(re.findall(pattern, sHtmlContent, re.DOTALL))
+    # 2. Episoden direkt aus den Tabellenzeilen parsen
+    # Jede <tr class="episode-row"> enthält: Nummer, Titel, Link (onclick) und Hoster-Icons
+    # NUR Zeilen mit watch-link Icons anzeigen = nur bereits verfügbare Episoden
+    sHtmlFlat = re.sub(r'\s+', ' ', sHtmlContent)
+    # tr-Tag + Inhalt zusammen erfassen: onclick ist am tr-Tag selbst
+    rows = re.findall(r'(<tr[^>]*class="episode-row[^"]*"[^>]*>)(.*?)</tr>', sHtmlFlat, re.DOTALL)
 
-    # Jetzt holen wir die Links aus der Navigation (wie zuvor)
-    pattern_nav = r'href="([^"]*/episode-(\d+))"'
-    nav_links = re.findall(pattern_nav, sHtmlContent)
-    
-    # Dubletten aus der Navigation entfernen (da oft mehrfach vorhanden)
-    seen_eps = set()
     unique_nav = []
-    for url, ep_nr in nav_links:
-        if ep_nr not in seen_eps:
-            seen_eps.add(ep_nr)
-            unique_nav.append((url, ep_nr))
+    titles_dict = {}
+    for tr_tag, row_content in rows:
+        # Nur Episoden mit tatsächlichen Streams anzeigen
+        if 'watch-link' not in row_content:
+            continue
+        # Episodennummer
+        nr_match = re.search(r'episode-number-cell">\s*(\d+)\s*<', row_content)
+        if not nr_match:
+            continue
+        ep_nr = nr_match.group(1)
+        # Link aus onclick am tr-Tag
+        link_match = re.search(r"onclick=\"window\.location='([^']+)'\"", tr_tag)
+        if not link_match:
+            continue
+        ep_url = link_match.group(1)
+        # Deutschen Titel bevorzugen, englisch als Fallback
+        title_match = re.search(r'episode-title-ger"[^>]*title="([^"]+)"', row_content)
+        if not title_match:
+            title_match = re.search(r'episode-title-eng"[^>]*title="([^"]+)"', row_content)
+        ep_title = unescape(title_match.group(1)).strip() if title_match else ""
+        titles_dict[ep_nr] = ep_title
+        unique_nav.append((ep_url, ep_nr))
 
     oGui = cGui()
     total = len(unique_nav)
@@ -666,7 +912,7 @@ def showEpisodes():
         sEpName = unescape(sEpName)
         
         # Formatierung: "1 - Der Tote am See"
-        sDisplayTitle = "Episode %s" % sEpNr
+        sDisplayTitle = "%s %s" % (cConfig().getLocalizedString(30513), sEpNr)
         if sEpName:
             sDisplayTitle += " - %s" % sEpName
         
@@ -697,12 +943,12 @@ def showHosters():
     if not sHtmlContent:
         return []
 
-    # Wir suchen erst alle Buttons (die "Container")
+    # Find all buttons (containers)
     button_pattern = r'<button[^>]*class="[^"]*link-box[^"]*"[^>]*>'
     buttons = re.findall(button_pattern, sHtmlContent)
 
     for sButton in buttons:
-        # Einzel-Extraktion: So ist die Reihenfolge im HTML egal!
+        # Individual extraction: HTML order does not matter
         url_match = re.search(r'data-play-url="([^"]+)"', sButton)
         name_match = re.search(r'data-provider-name="([^"]+)"', sButton)
         lang_match = re.search(r'data-language-id="([^"]+)"', sButton)
@@ -712,7 +958,7 @@ def showHosters():
             sName = name_match.group(1)
             sLang = lang_match.group(1)
 
-            # --- Deine originale Filter-Logik ---
+            # --- Language filter logic ---
             if cConfig().isBlockedHoster(sName)[0]: continue
             
             sLanguage = cConfig().getSetting('prefLanguage')
@@ -722,7 +968,7 @@ def showHosters():
             sLangLabel = '(DE)' if sLang == '1' else '(EN)' if sLang == '2' else sLang
             sQuality = '720'
             
-            # WICHTIG: Die Struktur, die dein Core zum Anzeigen braucht
+            # Structure required by the core for display
             hoster = {
                 'link': [sHUrl, sName], 
                 'name': sName, 
@@ -732,14 +978,15 @@ def showHosters():
             }
             hosters.append(hoster)
 
-    # Den Funktionsnamen für den Core-Callback anhängen
+    # Append function name for core callback
     if hosters:
         hosters.append('getHosterUrl')
-    
+    if not hosters:
+        cGui().showLanguage()
     return hosters
 
 def getHosterUrl(hUrl):
-    if type(hUrl) == str: hUrl = eval(hUrl)
+    if type(hUrl) == str: hUrl = ast.literal_eval(hUrl)
     Request = cRequestHandler(URL_MAIN + hUrl[0], caching=False)
     Request.addHeaderEntry('Referer', ParameterHandler().getValue('entryUrl'))
     Request.addHeaderEntry('Upgrade-Insecure-Requests', '1')
@@ -747,16 +994,21 @@ def getHosterUrl(hUrl):
     sUrl = Request.getRealUrl()
 
     if 'voe' in hUrl[1].lower():
-        isBlocked, sDomain = cConfig().isBlockedHoster(sUrl)  # Die funktion gibt 2 werte zurück!
-        if isBlocked:  # Voe Pseudo sDomain nicht bekannt in resolveUrl
+        isBlocked, sDomain = cConfig().isBlockedHoster(sUrl)  # Function returns 2 values!
+        if isBlocked:  # VOE pseudo domain not known in resolveUrl
             sUrl = sUrl.replace(sDomain, 'voe.sx')
             return [{'streamUrl': sUrl, 'resolved': False}]
 
     return [{'streamUrl': sUrl, 'resolved': False}]
 
 def showSearch():
-    sSearchText = cGui().showKeyBoard(sHeading=cConfig().getLocalizedString(30281))
-    if not sSearchText: return
+    # Check if we have a cached search text (e.g. coming back from playback)
+    win = xbmcgui.Window(10000)
+    sSearchText = win.getProperty('xstream.serienstream.lastSearchText')
+    if not sSearchText:
+        sSearchText = cGui().showKeyBoard(sHeading=cConfig().getLocalizedString(30281))
+        if not sSearchText: return
+        win.setProperty('xstream.serienstream.lastSearchText', sSearchText)
     _search(False, sSearchText)
     cGui().setEndOfDirectory()
 
@@ -771,7 +1023,7 @@ def SSsearch(sGui=False, sSearchText=False, iPage=1):
     if not sSearchText:
         sSearchText = params.getValue('sSearchText')
     
-    # Falls iPage als String aus den Params kommt (beim Blättern)
+    # If iPage comes as string from params (when browsing)
     if params.getValue('iPage'):
         iPage = params.getValue('iPage')
 
@@ -791,7 +1043,7 @@ def SSsearch(sGui=False, sSearchText=False, iPage=1):
     sHtmlContent = re.sub(r'\s+', ' ', sHtmlContent)
     found_links = set()
 
-    # Regex für die Card-Struktur
+    # Regex for card structure
     pattern = r'class="card cover-card.*?href="(/serie/[^"]+)".*?(?:data-src|src)="([^"]+)".*?alt="([^"]+)"'
     aResult = re.findall(pattern, sHtmlContent)
 
@@ -807,6 +1059,7 @@ def SSsearch(sGui=False, sSearchText=False, iPage=1):
         sFullThumb = URL_MAIN + sThumbnail if sThumbnail.startswith('/') else sThumbnail
 
         oGuiElement = cGuiElement(sTitle, SITE_IDENTIFIER, 'showSeasons')
+        oGuiElement.setMediaType('tvshow')
         oGuiElement.setThumbnail(sFullThumb)
         
         p = ParameterHandler()
@@ -816,11 +1069,11 @@ def SSsearch(sGui=False, sSearchText=False, iPage=1):
         
         oGui.addFolder(oGuiElement, p)
 
-    # Nächste Seite Logik
+    # Next page logic
     if total >= 20:
         p = ParameterHandler()
         p.setParam('sSearchText', sSearchText)
-        p.setParam('iPage', str(int(iPage) + 1)) # Seite explizit erhöhen
+        p.setParam('iPage', str(int(iPage) + 1)) # Explicitly increment page
         oGui.addNextPage(SITE_IDENTIFIER, 'SSsearch', p)
 
     if not sGui:
@@ -844,13 +1097,4 @@ def getMetaInfo(link, title):   # Setzen von Metadata in Suche:
     for sImg, sDescr in aResult[1]:
         return sImg, sDescr
         
-def dump_to_file(content, filename="/tmp/debug_sto.html"):
-    try:
-        # Pfad im Home-Verzeichnis deines Debian-Users oder im Kodi-Temp-Ordner
-        import os
-        path = os.path.join(os.path.expanduser("~"), filename)
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(content)
-        logger.info(f"[{SITE_IDENTIFIER}] Dump erstellt unter: {path}")
-    except Exception as e:
-        logger.error(f"[{SITE_IDENTIFIER}] Dump fehlgeschlagen: {str(e)}")
+

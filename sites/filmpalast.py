@@ -9,6 +9,7 @@
 # showEpisodes:   4 Stunden
 
 import re
+import xbmcgui
 from resources.lib.handler.ParameterHandler import ParameterHandler
 from resources.lib.handler.requestHandler import cRequestHandler
 from resources.lib.tools import logger, cParser
@@ -27,12 +28,11 @@ if cConfig().getSetting('global_search_' + SITE_IDENTIFIER) == 'false':
     logger.info('-> [SitePlugin]: globalSearch for %s is deactivated.' % SITE_NAME)
 
 # Domain Abfrage
-DOMAIN = cConfig().getSetting('plugin_' + SITE_IDENTIFIER + '.domain', 'filmpalast.to') # Domain Auswahl über die xStream Einstellungen möglich
+DOMAIN = cConfig().getSetting('plugin_' + SITE_IDENTIFIER + '.domain', 'filmpalast.to') # Domain Auswahl über die Einstellungen möglich
 STATUS = cConfig().getSetting('plugin_' + SITE_IDENTIFIER + '_status') # Status Code Abfrage der Domain
 ACTIVE = cConfig().getSetting('plugin_' + SITE_IDENTIFIER) # Ob Plugin aktiviert ist oder nicht
 
 URL_MAIN = 'https://' + DOMAIN
-# URL_MAIN = 'https://filmpalast.to'
 URL_MOVIES = URL_MAIN + '/movies/%s'
 URL_ENGLISH = URL_MAIN + '/search/genre/Englisch'
 URL_SEARCH = URL_MAIN + '/search/title/%s'
@@ -41,31 +41,34 @@ URL_SERIES = URL_MAIN + '/serien/view'
 
 def load(): # Menu structure of the site plugin
     logger.info('Load %s' % SITE_NAME)
+    xbmcgui.Window(10000).clearProperty('xstream.filmpalast.lastSearchText')
     params = ParameterHandler()
     sLanguage = cConfig().getSetting('prefLanguage')
-    
-    # Logic moved from showMovieMenu to main load function
-    if sLanguage == '0' or '1':    # Alle Sprachen oder Deutsch
+
+    # English ganz oben wenn Sprache "Alle" oder "English"
+    if sLanguage == '0' or sLanguage == '2':    # Alle Sprachen oder English
+        params.setParam('sUrl', URL_ENGLISH)
+        cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30104), SITE_IDENTIFIER, 'showEntries'), params) # English
+
+    # Neu
+    params.setParam('sUrl', URL_MAIN)
+    cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30500), SITE_IDENTIFIER, 'showEntries'), params)  # Neu
+
+    # Deutsche Kategorien (bei Alle oder Deutsch)
+    if sLanguage == '0' or sLanguage == '1':    # Alle Sprachen oder Deutsch
         params.setParam('sUrl', URL_MOVIES % 'new')
         cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30502), SITE_IDENTIFIER, 'showEntries'), params)   # Filme
         params.setParam('sUrl', URL_MOVIES % 'top')
         cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30509), SITE_IDENTIFIER, 'showEntries'), params)  # Top movies
         params.setParam('sUrl', URL_MOVIES % 'imdb')
         cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30510), SITE_IDENTIFIER, 'showEntries'), params) # IMDB rating
-        if sLanguage == '0': # Nur bei Alle Sprachen
-            params.setParam('sUrl', URL_ENGLISH)
-            cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30104), SITE_IDENTIFIER, 'showEntries'), params) # English
         params.setParam('sUrl', URL_MOVIES % 'new')
         params.setParam('value', 'genre')
         cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30506), SITE_IDENTIFIER, 'showValue'), params)    # Genre
         params.setParam('value', 'movietitle')
         cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30517), SITE_IDENTIFIER, 'showValue'), params)  # From A-Z
-        
-    if sLanguage == '2':    # English
-        params.setParam('sUrl', URL_ENGLISH)
-        cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30104), SITE_IDENTIFIER, 'showEntries'), params) # English
-        
-    elif sLanguage == '3':    # Japanisch
+
+    if sLanguage == '3':    # Japanisch
         cGui().showLanguage()
 
     # Add Serien entry above search
@@ -97,20 +100,74 @@ def showValue():
     cGui().setEndOfDirectory()
 
 
-def showEntries(entryUrl=False, sGui=False, sSearchText=False):
-    oGui = sGui if sGui else cGui()
-    params = ParameterHandler()
-    if not entryUrl: entryUrl = params.getValue('sUrl')
-    isTvshow = False
-    oRequest = cRequestHandler(entryUrl, ignoreErrors=(sGui is not False), bypass_dns=True)
-    if cConfig().getSetting('global_search_' + SITE_IDENTIFIER) == 'true':
-        oRequest.cacheTime = 60 * 60 * 6  # 6 Stunden
-    sHtmlContent = oRequest.request()
+def _parsePage(sHtmlContent):
+    """Parst eine einzelne Seite und gibt (isMatch, aResult) zurück."""
     pattern = r'<article[^>]*>\s*<a href="([^"]+)" title="([^"]+)">\s*<img src=["\']([^"\']+)["\'][^>]*>(.*?)</article>'
     isMatch, aResult = cParser.parse(sHtmlContent, pattern)
     if not isMatch:
         pattern = r'<a[^>]*href="([^"]*)"[^>]*title="([^"]*)"[^>]*>[^<]*<img[^>]*src=["\']([^"\']*)["\'][^>]*>\s*</a>(\s*)</article>'
         isMatch, aResult = cParser.parse(sHtmlContent, pattern)
+    return isMatch, aResult if isMatch else []
+
+
+def _getNextPageUrl(sHtmlContent):
+    """Extrahiert die nächste Seiten-URL oder gibt False zurück."""
+    pattern = r'<a class="pageing[^"]*"\s*href=([^>]+)>[^\+]+\+</a>\s*</div>'
+    isMatch, sNextUrl = cParser.parseSingleResult(sHtmlContent, pattern)
+    if isMatch:
+        sNextUrl = sNextUrl.replace("'", "").replace('"', '')
+        if sNextUrl.startswith('/'):
+            sNextUrl = URL_MAIN + sNextUrl
+        return sNextUrl
+    return False
+
+
+def _fetchAllSearchPages(startUrl, sGui=False):
+    """Holt ALLE Seiten einer Suche und gibt kombinierte Ergebnisse zurück."""
+    allResults = []
+    currentUrl = startUrl
+    maxPages = 10  # Sicherheitslimit
+
+    for page in range(maxPages):
+        currentUrl = currentUrl.replace(' ', '%20')
+        oRequest = cRequestHandler(currentUrl, ignoreErrors=(sGui is not False), bypass_dns=True)
+        if cConfig().getSetting('global_search_' + SITE_IDENTIFIER) == 'true':
+            oRequest.cacheTime = 60 * 60 * 6
+        sHtmlContent = oRequest.request()
+        if not sHtmlContent:
+            break
+
+        isMatch, aResult = _parsePage(sHtmlContent)
+        if isMatch:
+            allResults.extend(aResult)
+
+        nextUrl = _getNextPageUrl(sHtmlContent)
+        if not nextUrl:
+            break
+        currentUrl = nextUrl
+
+    return allResults
+
+
+def showEntries(entryUrl=False, sGui=False, sSearchText=False):
+    oGui = sGui if sGui else cGui()
+    params = ParameterHandler()
+    if not entryUrl: entryUrl = params.getValue('sUrl')
+    entryUrl = entryUrl.replace(' ', '%20')  # Leerzeichen in URL encoden
+    isTvshow = False
+
+    # Bei Suche: ALLE Seiten auf einmal holen
+    if sSearchText:
+        aResult = _fetchAllSearchPages(entryUrl, sGui)
+        isMatch = len(aResult) > 0
+        sHtmlContent = None  # Nicht mehr nötig für Pagination
+    else:
+        oRequest = cRequestHandler(entryUrl, ignoreErrors=(sGui is not False), bypass_dns=True)
+        if cConfig().getSetting('global_search_' + SITE_IDENTIFIER) == 'true':
+            oRequest.cacheTime = 60 * 60 * 6  # 6 Stunden
+        sHtmlContent = oRequest.request()
+        isMatch, aResult = _parsePage(sHtmlContent)
+
     if not isMatch:
         if not sGui: oGui.showInfo()
         return
@@ -118,64 +175,62 @@ def showEntries(entryUrl=False, sGui=False, sSearchText=False):
     total = len(aResult)
     seen_tv_shows = set()
     
-    # SORTING CHANGE: Removed the check for '/movies/new'
-    # Now everything is sorted alphabetically
-    aResult = sorted(aResult, key=lambda x: x[1].lower())  # Sort alphabetically by name (case-insensitive)
+    # Sortierung (alphabetisch)
+    aResult = sorted(aResult, key=lambda x: x[1].lower())
     
     for sUrl, sName, sThumbnail, sDummy in aResult:
         isTvshow, _ = cParser.parse(sName, r'S\d\dE\d\d')
-        # seriesname should not be crippled here!
-        if sSearchText and not cParser.search(sSearchText, sName):
-            continue
+        
+        # Lockerer Suchfilter (ignoriert Sonderzeichen/Case)
+        if sSearchText:
+            search_clean = re.sub(r'\W+', '', sSearchText).lower()
+            name_clean = re.sub(r'\W+', '', sName).lower()
+            if search_clean not in name_clean:
+                continue
 
+        # Dedupe Logik für Serien (beibehalten)
         if isTvshow:
-            # Clean the name (e.g. "ABCDE S01E02" -> "ABCDE")
             cleanNameMatch = re.search(r'(.*?)\s*S\d+E\d+', sName, re.IGNORECASE)
             if cleanNameMatch:
                 cleanName = cleanNameMatch.group(1).strip()
-                # If we have already seen this show in this loop, skip it
                 if cleanName in seen_tv_shows:
                     continue
-                # Mark as seen and update the display name to the clean title
                 seen_tv_shows.add(cleanName)
                 sName = cleanName
 
         if sThumbnail.startswith('/'):
             sThumbnail = URL_MAIN + sThumbnail
-        ### ÄNDERUNG ANFANG ###
+
         isYear, sYear = cParser.parseSingleResult(sDummy, r'Jahr:[^>]([\d]+)')
         isDuration, sDuration = cParser.parseSingleResult(sDummy, r'(?:Laufzeit|Spielzeit):[^>]([\d]+)')
         isRating, sRating = cParser.parseSingleResult(sDummy, 'Imdb:[^>]([^/]+)')
-        ### ÄNDERUNG ENDE ###
+
         oGuiElement = cGuiElement(sName, SITE_IDENTIFIER, 'showSeasons' if isTvshow else 'showHosters')
         oGuiElement.setMediaType('tvshow' if isTvshow else 'movie')
         oGuiElement.setThumbnail(sThumbnail)
-        if isYear:
-            oGuiElement.setYear(sYear)
-        if isDuration:
-            oGuiElement.addItemValue('duration', sDuration)
-        if isRating:
-            oGuiElement.addItemValue('rating', sRating.replace(',', '.'))
-        # Parameter übergeben
+        if isYear: oGuiElement.setYear(sYear)
+        if isDuration: oGuiElement.addItemValue('duration', sDuration)
+        if isRating: oGuiElement.addItemValue('rating', sRating.replace(',', '.'))
+
         if sUrl.startswith('//'):
             params.setParam('entryUrl', 'https:' + sUrl)
         else:
             params.setParam('entryUrl', sUrl)
+        
         params.setParam('sName', sName)
         params.setParam('sThumbnail', sThumbnail)
         oGui.addFolder(oGuiElement, params, isTvshow, total)
-    if not sGui and not sSearchText:
-        pattern = r'<a class="pageing[^"]*"\s*href=([^>]+)>[^\+]+\+</a>\s*</div>'
-        isMatchNextPage, sNextUrl = cParser.parseSingleResult(sHtmlContent, pattern)
-        if isMatchNextPage:
-            sNextUrl = sNextUrl.replace("'", "").replace('"', '')
-            if sNextUrl.startswith('/'):
-                sNextUrl = URL_MAIN + sNextUrl
-            params.setParam('sUrl', sNextUrl)
-            oGui.addNextPage(SITE_IDENTIFIER, 'showEntries', params)
-        oGui.setView('tvshows' if isTvshow else 'movies')
-        oGui.setEndOfDirectory()
 
+    # --- PAGINATION nur für Kategorien (nicht für Suche, da schon alle Seiten geholt) ---
+    if not sGui and not sSearchText and sHtmlContent:
+        nextUrl = _getNextPageUrl(sHtmlContent)
+        if nextUrl:
+            params.setParam('sUrl', nextUrl)
+            oGui.addNextPage(SITE_IDENTIFIER, 'showEntries', params)
+    if not sGui:
+        oGui.setView('tvshows' if isTvshow else 'movies')
+        if not sSearchText:
+            oGui.setEndOfDirectory()
 
 def showSeasons():
     params = ParameterHandler()
@@ -195,7 +250,7 @@ def showSeasons():
     isDesc, sDesc = cParser.parseSingleResult(sHtmlContent, '"description">([^<]+)')
     total = len(aResult)
     for sSeason in aResult:
-        oGuiElement = cGuiElement('Staffel ' + str(sSeason), SITE_IDENTIFIER, 'showEpisodes')
+        oGuiElement = cGuiElement(cConfig().getLocalizedString(30512) + ' ' + str(sSeason), SITE_IDENTIFIER, 'showEpisodes')
         oGuiElement.setTVShowTitle(sName)
         oGuiElement.setSeason(sSeason)
         oGuiElement.setMediaType('season')
@@ -230,7 +285,7 @@ def showEpisodes():
     total = len(aResult)
     for sUrl in aResult:
         isMatch, sName = cParser.parseSingleResult(sUrl, r'e(\d+)')
-        oGuiElement = cGuiElement('Episode ' + str(sName), SITE_IDENTIFIER, 'showHosters')
+        oGuiElement = cGuiElement(cConfig().getLocalizedString(30513) + ' ' + str(sName), SITE_IDENTIFIER, 'showHosters')
         oGuiElement.setThumbnail(sThumbnail)
         oGuiElement.setTVShowTitle(sShowName)
         oGuiElement.setSeason(sSeason)
@@ -280,20 +335,26 @@ def getHosterUrl(sUrl=False):
 
 
 def showSearch():
-    sSearchText = cGui().showKeyBoard(sHeading=cConfig().getLocalizedString(30281))
-    if not sSearchText: return
+    # Check if we have a cached search text (e.g. coming back from playback)
+    win = xbmcgui.Window(10000)
+    sSearchText = win.getProperty('xstream.filmpalast.lastSearchText')
+    if not sSearchText:
+        sSearchText = cGui().showKeyBoard(sHeading=cConfig().getLocalizedString(30281))
+        if not sSearchText: return
+        win.setProperty('xstream.filmpalast.lastSearchText', sSearchText)
     _search(False, sSearchText)
     cGui().setEndOfDirectory()
 
 
 def _search(oGui, sSearchText):
-    showEntries(URL_SEARCH % cParser.quotePlus(sSearchText), oGui, sSearchText)
+    # Quote nutzen statt quotePlus, damit Leerzeichen als %20 übergeben werden
+    showEntries(URL_SEARCH % cParser.quote(sSearchText), oGui, sSearchText)
 
 
 def showSeriesMenu(): # Menu structure of series menu
     params = ParameterHandler()
     params.setParam('sUrl', URL_SERIES)
-    cGui().addFolder(cGuiElement('Alle ' + cConfig().getLocalizedString(30511), SITE_IDENTIFIER, 'showEntries'), params) # Alle Serien
+    cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30518), SITE_IDENTIFIER, 'showEntries'), params) # All Series
     params.setParam('value', 'movietitle')
     cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30517), SITE_IDENTIFIER, 'showValue'), params) # Von A bis Z
     cGui().setEndOfDirectory()

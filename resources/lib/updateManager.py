@@ -16,50 +16,20 @@ from xbmcvfs import translatePath
 
 # Resolver
 def resolverUpdate(silent=False):
-    # Nightly Branch
-    if cConfig().getSetting('resolver.branch') == 'nightly':
-        username = 'fetchdevteam'
-        resolve_dir = 'snipsolver'
-        resolve_id = 'script.module.resolveurl'
-        # Abfrage aus den Einstellungen welcher Branch
-        branch = 'nightly'
-        token = ''
+    # Release Branch https://github.com/Gujal00/ResolveURL
+    username = 'Gujal00'
+    resolve_dir = 'ResolveURL'
+    resolve_id = 'script.module.resolveurl'
+    branch = 'master'
+    token = ''
 
-        try:
-            return UpdateResolve(username, resolve_dir, resolve_id, branch, token, silent)
-        except Exception as e:
-            log(' -> [updateManager]: Exception Raised: %s' % str(e), LOGERROR)
-            Dialog().ok(cConfig().getLocalizedString(30151), cConfig().getLocalizedString(30156) + resolve_id + cConfig().getLocalizedString(30157))
-            return
-    else:
-        # Release Branch https://github.com/Gujal00/ResolveURL
-        username = 'Gujal00'
-        resolve_dir = 'ResolveURL'
-        resolve_id = 'script.module.resolveurl'
-        # Abfrage aus den Einstellungen welcher Branch
-        branch = 'master'
-        token = ''
-
-        try:
-            return UpdateResolve(username, resolve_dir, resolve_id, branch, token, silent)
-        except Exception as e:
-            log(' -> [updateManager]: Exception Raised: %s' % str(e), LOGERROR)
-            Dialog().ok(cConfig().getLocalizedString(30151), cConfig().getLocalizedString(30156) + resolve_id + cConfig().getLocalizedString(30157))
-            return
-
-
-# xStream Dev
-def xStreamDevUpdate(silent=False):
-    username = cConfig().getSettingString('xstream.dev.username')
-    plugin_id = cConfig().getSettingString('xstream.dev.id')
-    branch = cConfig().getSettingString('xstream.dev.branch')
-    token = cConfig().getSettingString('xstream.dev.token')
     try:
-        return Update(username, plugin_id, branch, token, silent)
+        return UpdateResolve(username, resolve_dir, resolve_id, branch, token, silent)
     except Exception as e:
         log(' -> [updateManager]: Exception Raised: %s' % str(e), LOGERROR)
-        Dialog().ok(cConfig().getLocalizedString(30151), cConfig().getLocalizedString(30156) + plugin_id + cConfig().getLocalizedString(30157))
-        return False
+        Dialog().ok(cConfig().getLocalizedString(30151), cConfig().getLocalizedString(30156) + resolve_id + cConfig().getLocalizedString(30157))
+        return
+
 
 # Update Resolver
 def UpdateResolve(username, resolve_dir, resolve_id, branch, token, silent):
@@ -105,44 +75,6 @@ def UpdateResolve(username, resolve_dir, resolve_id, branch, token, silent):
         log(cConfig().getLocalizedString(30166) + ' -> [updateManager]: %s: - Error updating!' % resolve_id, LOGERROR)
         Dialog().ok(cConfig().getLocalizedString(30151), cConfig().getLocalizedString(30156) + resolve_id + cConfig().getLocalizedString(30157))
 
-# xStream Update
-def Update(username, plugin_id, branch, token, silent):
-    REMOTE_PLUGIN_COMMITS = "https://api.github.com/repos/%s/%s/commits/%s" % (username, plugin_id, branch)
-    REMOTE_PLUGIN_DOWNLOADS = "https://api.github.com/repos/%s/%s/zipball/%s" % (username, plugin_id, branch)
-    auth = HTTPBasicAuth(username, token)
-    log(cConfig().getLocalizedString(30166) + ' -> [updateManager]: %s: - Search for updates.' % plugin_id, LOGNOTICE)
-    try:
-        ADDON_DIR = translatePath(os.path.join('special://userdata/addon_data/', '%s') % plugin_id)
-        LOCAL_PLUGIN_VERSION = os.path.join(ADDON_DIR, "update_sha")
-        LOCAL_FILE_NAME_PLUGIN = os.path.join(ADDON_DIR, 'update-' + plugin_id + '.zip')
-        if not os.path.exists(ADDON_DIR): os.mkdir(ADDON_DIR)
-        # ka - Update erzwingen
-        if cConfig().getSetting('enforceUpdate') == 'true':
-            if os.path.exists(LOCAL_PLUGIN_VERSION): os.remove(LOCAL_PLUGIN_VERSION)
-
-        path = translatePath(os.path.join('special://home/addons/', '%s') % plugin_id)
-        commitXML = _getXmlString(REMOTE_PLUGIN_COMMITS, auth)
-        if commitXML:
-            isTrue = commitUpdate(commitXML, LOCAL_PLUGIN_VERSION, REMOTE_PLUGIN_DOWNLOADS, path, plugin_id,
-                                  LOCAL_FILE_NAME_PLUGIN, silent, auth)
-            if isTrue is True:
-                log(cConfig().getLocalizedString(30166) + ' -> [updateManager]: %s: - download new update.' % plugin_id, LOGNOTICE)
-                if silent is False: Dialog().ok(cConfig().getLocalizedString(30151), cConfig().getLocalizedString(30158) + plugin_id + cConfig().getLocalizedString(30159))
-                log(cConfig().getLocalizedString(30166) + ' -> [updateManager] %s: - install new update.' % plugin_id, LOGNOTICE)
-                return True
-            elif isTrue is None:
-                log(cConfig().getLocalizedString(30166) + ' -> [updateManager]: %s: - no update available.' % plugin_id, LOGNOTICE)
-                if silent is False: Dialog().ok(cConfig().getLocalizedString(30151), cConfig().getLocalizedString(30160) + plugin_id + cConfig().getLocalizedString(30161))
-                return None
-
-        log(cConfig().getLocalizedString(30166) + ' -> [updateManager]: %s: - Error updating!' % plugin_id, LOGERROR)
-        Dialog().ok(cConfig().getLocalizedString(30151), cConfig().getLocalizedString(30156) + plugin_id + cConfig().getLocalizedString(30157))
-        return False
-    except:
-        log(cConfig().getLocalizedString(30166) + ' -> [updateManager]: %s: - Error updating!' % plugin_id, LOGERROR)
-        Dialog().ok(cConfig().getLocalizedString(30151), cConfig().getLocalizedString(30156) + plugin_id + cConfig().getLocalizedString(30157))
-
-
 def commitUpdate(onlineFile, offlineFile, downloadLink, LocalDir, plugin_id, localFileName, silent, auth):
     try:
         jsData = json.loads(onlineFile)
@@ -177,6 +109,8 @@ def doUpdate(LocalDir, REMOTE_PATH, Title, localFileName, auth):
         for index, n in enumerate(updateFile.namelist()):
             if n[-1] != "/":
                 dest = os.path.join(LocalDir, "/".join(n.split("/")[1:]))
+                if not os.path.abspath(dest).startswith(os.path.abspath(LocalDir)):
+                    continue  # skip entries that escape target directory
                 destdir = os.path.dirname(dest)
                 if not os.path.isdir(destdir):
                     os.makedirs(destdir)
@@ -200,7 +134,7 @@ def removeFilesNotInRepo(updateFile, LocalDir):
     updateFileNameList = [i.split("/")[-1] for i in updateFile.namelist()]
 
     for root, dirs, files in os.walk(LocalDir):
-        if ".git" in root or "pydev" in root or ".idea" in root:
+        if ".git" in root or ".idea" in root:
             continue
         else:
             for file in files:
@@ -234,76 +168,14 @@ def zipfolder(foldername, target_dir):
 
 def devUpdates():  # für manuelles Updates vorgesehen
     try:
-        resolverupdate = False # Resolver Update
-        #pluginupdate = False # xStream Update
-        # Einleitungstext
-        #if Dialog().ok(cConfig().getLocalizedString(30151), cConfig().getLocalizedString(30152)):
-            # Abfrage welches Plugin aktualisiert werden soll (kann erweitert werden)
-        #    options = [cConfig().getLocalizedString(30153),
-        #               cConfig().getLocalizedString(30096) + ' ' + cConfig().getLocalizedString(30154),
-        #               cConfig().getLocalizedString(30030) + ' ' + cConfig().getLocalizedString(30154)]
-        #    result = Dialog().select(cConfig().getLocalizedString(30151), options)
-        #else:
-            #return False
+        # Resolver Release Update
+        cConfig().setSetting('resolver.branch', 'release')
 
-        #if result == -1:  # Abbrechen
-            #return False
-
-        #elif result == 0:  # Alle Addons aktualisieren
-            # Abfrage ob ResolveURL Release oder Nightly Branch (kann erweitert werden)
-        result = Dialog().yesno(cConfig().getLocalizedString(30151), cConfig().getLocalizedString(30268), yeslabel='Nightly', nolabel='Release')
-
-        if result == 0:
-            cConfig().setSetting('resolver.branch', 'release')
-        elif result == 1:
-            cConfig().setSetting('resolver.branch', 'nightly')
-
-        # Voreinstellung beendet
-        if Dialog().yesno(cConfig().getLocalizedString(30151), cConfig().getLocalizedString(30269), yeslabel=cConfig().getLocalizedString(30162), nolabel=cConfig().getLocalizedString(30163)):
-            # Updates ausführen
-            #pluginupdate = True
-            resolverupdate = True
-        else:
-            return False
-
-        #elif result == 1:  # xStream aktualisieren
-        #    if Dialog().yesno(cConfig().getLocalizedString(30151), cConfig().getLocalizedString(30269),
-        #                      yeslabel=cConfig().getLocalizedString(30162),
-        #                      nolabel=cConfig().getLocalizedString(30163)):
-        #        # Updates ausführen
-        #        pluginupdate = True
-        #    else:
-        #        return False
-
-        #elif result == 2:  # Resolver aktualisieren
-        #    # Abfrage ob ResolveURL Release oder Nightly Branch (kann erweitert werden)
-        #    result = Dialog().yesno(cConfig().getLocalizedString(30151), cConfig().getLocalizedString(30268), yeslabel='Nightly',
-        #                            nolabel='Release')
-
-        #    if result == 0:
-        #        cCOnfig().setSetting('resolver.branch', 'release')
-        #    elif result == 1:
-        #        cConfig().setSetting('resolver.branch', 'nightly')
-
-        #    # Voreinstellung beendet
-        #    if Dialog().yesno(cConfig().getLocalizedString(30151), cConfig().getLocalizedString(30269),
-        #                      yeslabel=cConfig().getLocalizedString(30162),
-        #                      nolabel=cConfig().getLocalizedString(30163)):
-        #        # Updates ausführen
-        #        resolverupdate = True
-        #    else:
-        #        return False
-
-        #if pluginupdate is True:
-           #try:
-                #xStreamUpdate(False)
-            #except:
-                #pass
-        if resolverupdate is True:
-            try:
-                resolverUpdate(False)
-            except:
-                pass
+        # Update direkt ausführen
+        try:
+            resolverUpdate(False)
+        except:
+            pass
 
         # Zurücksetzten der Update.sha
         if cConfig().getSetting('enforceUpdate') == 'true': cConfig().setSetting('enforceUpdate', 'false')

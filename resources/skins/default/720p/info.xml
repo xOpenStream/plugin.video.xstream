@@ -974,7 +974,7 @@
 					<texturenofocus border="10" diffuse="box.png" colordiffuse="D0FFFFFF">focus.png</texturenofocus>
 					<texturefocus border="10" diffuse="box.png" colordiffuse="$INFO[Window.Property(color)]">focus.png</texturefocus>
 					<animation reversible="false" center="auto" easing="inout" effect="zoom" end="100" start="90" time="400" tween="back">Focus</animation>
-					<visible>String.isEqual(Window.Property(isTrailer),true)</visible>
+					<visible>!Player.HasMedia</visible>
 				</control>
 			</control>
 		</control>

@@ -1,0 +1,71 @@
+Scraper Structure
+-----------------
+
+# Please place all imports at the top for better overview!
+
+from resources.lib.handler.ParameterHandler import ParameterHandler
+from resources.lib.handler.requestHandler import cRequestHandler
+from resources.lib.tools import logger, cParser, cUtil
+from resources.lib.gui.guiElement import cGuiElement
+from resources.lib.config import cConfig
+from resources.lib.gui.gui import cGui
+
+----------------------------------------------------------------------------
+
+# Names for sources
+
+SITE_IDENTIFIER =               ''
+SITE_NAME =                     ''
+SITE_ICON =                     ''
+URL_MAIN =                      ''
+URL_MOVIES =                    ''
+URL_POPULAR_MOVIES = URL_MAIN + ''
+URL_CINEMA = URL_MAIN +         ''
+URL_SERIES = URL_MAIN +         ''
+URL_POPULAR_SERIES = URL_MAIN + ''
+URL_POPULAR = URL_MAIN +        ''
+URL_GENRE = URL_MAIN +          ''
+URL_SEARCH = URL_MAIN +         ''
+URL_LOGIN = URL_MAIN +          ''
+URL_ENGLISH = URL_MAIN +        ''
+URL_NEW = URL_MAIN +            ''
+URL_ANIMATION = URL_MAIN +      ''
+URL_DOCUMENTARY = URL_MAIN +    ''
+
+----------------------------------------------------------------------------
+
+# Integration of the language function in index pages
+
+	-	sLanguage = cConfig().getSetting('prefLanguage')	# Language selection from settings.xml; write a standard def from this
+		params.setParam('sLanguage', sLanguage)
+	0 = All languages
+	1 = German
+	2 = English
+	3 = Japanese
+
+	# e.g. in the menu
+	def load():
+		logger.info('Load %s' % SITE_NAME)
+		params = ParameterHandler()
+		# Language setting from settings.xml
+		sLanguage = cConfig().getSetting('prefLanguage')
+		if sLanguage == '1':	# 1 = German
+			sLanguage = '2'
+		elif sLanguage == '2':	# 2 = English
+			sLanguage = '3'
+		else:
+			sLanguage = 'all'	# 0 = All languages
+		params.setParam('sLanguage', sLanguage)	
+		params.setParam('sUrl', URL_KINO)
+		cGui().addFolder(cGuiElement('Current Cinema Movies', SITE_IDENTIFIER, 'showEntries'), params) # set cConfig().getLocalizedString(30500) for the respective entry
+		cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30500), SITE_IDENTIFIER, 'showEntries'), params)
+		
+----------------------------------------------------------------------------
+
+# Integration of the quality function in index pages		
+	
+
+	-	sQuality = cConfig().getSetting('preferedQuality')	# Quality selection from settings.xml; write a standard def from this
+		params.setParam('sQuality', sQuality)
+		
+----------------------------------------------------------------------------
