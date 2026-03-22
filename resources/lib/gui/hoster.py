@@ -2,7 +2,7 @@
 # Python 3
 #
 # 24.01.23 - Heptamer: Korrektur getpriorities (nun werden alle Hoster gelesen und sortiert)
-# 22.12.24 - Heptamer: m3u8 und mpd Files über inputstream adaptive abspielen lassen
+# 22.12.24 - Heptamer: m3u8 und mpd Files - MimeType für native Kodi Wiedergabe
 
 import xbmc
 import xbmcgui 
@@ -74,82 +74,55 @@ class cHosterGui:
             except:
                 pass
 
-        vers = int(xbmc.getInfoLabel("System.BuildVersion").split(".")[0])
-
         logger.info('-> [hoster]: play file link: ' + str(data['link']))
         list_item = xbmcgui.ListItem(path=data['link'])
-        #m3u8 und mpd via inputstream, exklusive Filemoon, da IA mit dem Hoster nicht unter Android läuft
-        if not 'filemoon' in siteResult['streamUrl']:
-            if '.m3u8' in data['link'] or '.mpd' in data['link']:
-                list_item.setProperty("inputstream", "inputstream.adaptive")
-                if '.mpd' in data['link']:
-                    if vers < 21: list_item.setProperty('inputstream.adaptive.manifest_type', 'mpd')
-                    list_item.setMimeType('application/dash+xml')
-                else:
-                    if vers < 21: list_item.setProperty('inputstream.adaptive.manifest_type', 'hls')
-                    list_item.setMimeType("application/vnd.apple.mpegurl")
-                if '|' in data['link']:
-                    data['link'], header = data['link'].split('|')
-                    list_item.setProperty('inputstream.adaptive.stream_headers', header)
-                    if vers > 19: list_item.setProperty('inputstream.adaptive.manifest_headers', header)
+        # MimeType setzen damit Kodi das Format nativ erkennt
+        if '.mpd' in data['link']:
+            list_item.setMimeType('application/dash+xml')
+            list_item.setContentLookup(False)
+        elif '.m3u8' in data['link']:
+            list_item.setMimeType('application/vnd.apple.mpegurl')
+            list_item.setContentLookup(False)
 
         if 'youtube' in data['link']:
             import time
             time.sleep(1)
-        info = {'Title': data['title']}
         if data['thumb']:
             list_item.setArt(data['thumb'])
-        if data['showTitle']:
-            info['Episode'] = data['episode']
-            info['Season'] = data['season']
-            info['TVShowTitle'] = data['showTitle']
-            info['mediatype'] = 'episode'
-        elif data.get('mediaType') == 'movie':
-            info['mediatype'] = 'movie'
-        if data.get('year'):
-            info['Year'] = data['year']
-        if data.get('imdb_id'):
-            info['imdbnumber'] = data['imdb_id']
 
-        #Neuer Video-Tag, mit Kodi 19 nicht kompatibel, daher folgende Abfrage
-        kodi_version = xbmc.getInfoLabel('System.BuildVersion')
-        if kodi_version[:2] < '20':
-            list_item.setInfo(type="Video", infoLabels=info)
+        vtag = list_item.getVideoInfoTag()
+        # Korrekten MediaType setzen (für Trakt.TV Scrobbling)
+        if data.get('showTitle') and data.get('episode'):
+            vtag.setMediaType('episode')
+        elif data.get('mediaType') in ('movie', 'episode', 'tvshow', 'season'):
+            vtag.setMediaType(data['mediaType'])
         else:
-            vtag = list_item.getVideoInfoTag()
-            # Korrekten MediaType setzen (für Trakt.TV Scrobbling)
-            if data.get('showTitle') and data.get('episode'):
-                vtag.setMediaType('episode')
-            elif data.get('mediaType') in ('movie', 'episode', 'tvshow', 'season'):
-                vtag.setMediaType(data['mediaType'])
-            else:
-                vtag.setMediaType('video')
-            if 'Title' in info:
+            vtag.setMediaType('video')
+        if data.get('title'):
+            try:
+                vtag.setTitle(str(data['title']))
+            except: pass
+        if data.get('showTitle'):
+            try:
+                vtag.setTvShowTitle(data['showTitle'])
+            except: pass
+            if data.get('season'):
                 try:
-                    vtag.setTitle(str(info['Title']))
+                    vtag.setSeason(int(data['season']))
                 except: pass
-            if 'Season' in info:
+            if data.get('episode'):
                 try:
-                    vtag.setSeason(int(info['Season']))
+                    vtag.setEpisode(int(data['episode']))
                 except: pass
-            if 'Episode' in info:
-                try:
-                    vtag.setEpisode(int(info['Episode']))
-                except: pass
-            if 'TVShowTitle' in info:
-                try:
-                    vtag.setTvShowTitle(info['TVShowTitle'])
-                except: pass
-            # Jahr und IMDb ID setzen (für Trakt.TV Scrobbling)
-            if data.get('year'):
-                try:
-                    vtag.setYear(int(data['year']))
-                except: pass
-            if data.get('imdb_id'):
-                try:
-                    vtag.setUniqueID(str(data['imdb_id']), 'imdb', True)
-                    vtag.setIMDBNumber(str(data['imdb_id']))
-                except: pass
+        # Jahr und IMDb ID setzen (für Trakt.TV Scrobbling)
+        if data.get('year'):
+            try:
+                vtag.setYear(int(data['year']))
+            except: pass
+        if data.get('imdb_id'):
+            try:
+                vtag.setUniqueID(str(data['imdb_id']), 'imdb', True)
+            except: pass
 
         list_item.setProperty('IsPlayable', 'true')
         if cGui().pluginHandle > 0:
@@ -251,75 +224,85 @@ class cHosterGui:
     def __getPriorities(self, hosterList, filter=True):
         # Sort hosters based on their resolvers priority.
         ranking = []
-        # handles multihosters but is about 10 times slower
-        for hoster in hosterList:
 
-            # we try to load resolveurl within the loop, making sure that the resolver loads new with every cycle
-            try:
-                import resolveurl as resolver
-            except:
-                import urlresolver as resolver
-                 
+        # Import resolver module once (Python caches modules, re-importing in loop has no effect)
+        try:
+            import resolveurl as resolver_module
+        except:
+            import urlresolver as resolver_module
+
+        for hoster in hosterList:
             # accept hoster which is marked as resolveable by sitePlugin
             if hoster.get('resolveable', False):
                 ranking.append([0, hoster])
                 continue
-             
+
             try:
                 # serienstream VOE hoster = {'link': [sUrl, sName], aus array "[0]" True bzw. False
                 link = hoster['link'][0] if isinstance(hoster['link'], list) else hoster['link']
-                hmf = resolver.HostedMediaFile(url=link)
-                #hmf = resolver.HostedMediaFile(url=hoster['link'])
-            except:
+                hmf = resolver_module.HostedMediaFile(url=link)
+            except Exception as e:
+                logger.error('-> [hoster]: getPriorities HostedMediaFile error: %s' % e)
                 continue
 
             if not hmf.valid_url():
-                hmf = resolver.HostedMediaFile(host=hoster['name'].lower(), media_id='dummy')
+                hmf = resolver_module.HostedMediaFile(host=hoster['name'].lower(), media_id='dummy')
 
-            if len(hmf.get_resolvers()):
-                priority = False
-                for resolver in hmf.get_resolvers():
-                    # prefer individual priority
-                    if not resolver.isUniversal():
-                        priority = resolver._get_priority()
+            resolvers = hmf.get_resolvers()
+            if resolvers:
+                priority = None
+                for res in resolvers:
+                    # prefer individual hoster priority over universal (debrid) priority
+                    if not res.isUniversal():
+                        priority = res._get_priority()
                         break
-                    if not priority:
-                        priority = resolver._get_priority()
-                if priority:
+                    if priority is None:
+                        priority = res._get_priority()
+                if priority is not None:
                     ranking.append([priority, hoster])
             elif not filter:
                 ranking.append([999, hoster])
 
-            # Reset resolver so we have a fresh instance when loop starts again
-            del(resolver) 
+        # Combined sort: Language (asc) -> Quality (desc) -> Resolver Priority (asc)
+        pref_quali = cConfig().getSetting('preferedQuality')
+        has_language = any('languageCode' in hoster[1] for hoster in ranking)
 
-        if any('quality' in hoster[1] for hoster in ranking):
-            try:
-                # Sortiere Hoster nach Qualität (cConfig().getSetting('preferedQuality') == '5')
-                pref_quali = cConfig().getSetting('preferedQuality')
-                if pref_quali != '5' and any('quality' in hoster[1] and int(hoster[1]['quality']) == int(pref_quali) for hoster in ranking):
-                    ranking = sorted(ranking, key=lambda hoster: int('quality' in hoster[1] and hoster[1]['quality']) == int(pref_quali), reverse=True)
+        def sort_key(item):
+            priority, hoster = item
+
+            # 1) Language: ascending (lower code = preferred). Default 999 if no languageCode.
+            lang = hoster.get('languageCode', 999) if has_language else 0
+
+            # 2) Quality: hosters with quality info ranked higher than those without.
+            #    If preferedQuality is a specific resolution (not '5'/Best),
+            #    exact matches get top priority (0), others sorted descending by quality.
+            #    If preferedQuality is '5' (Best), sort descending by quality value.
+            has_qual = 'quality' in hoster
+            if has_qual:
+                qual = int(hoster['quality'])
+                if pref_quali != '5':
+                    # Exact match = 0 (best), non-match = 1, then within non-matches higher quality first
+                    qual_match = 0 if qual == int(pref_quali) else 1
+                    qual_value = -qual  # negative for descending sort
                 else:
-                # Wenn Hosterliste prüfen an ist, sortiere Hoster nach Prio Qualität
-                    ranking = sorted(ranking, key=lambda hoster: 'quality' in hoster[1] and int(hoster[1]['quality']), reverse=True)
-            except:
-                pass
-        # After sorting Quality, we sort for Hoster-Priority :) -Hep 24.01.23
-        # ranking = sorted(ranking, key=lambda ranking: ranking[0])
-
-        # Hoster Sprache über sLang im Siteplugin Prio nach sLang Code Reihenfolge (Deutsch, Englisch, Englisch mit untertitel
-        if ranking:
-            if  "languageCode" in ranking[0][1]:
-                ranking = sorted(ranking, key=lambda ranking: (ranking[1]["languageCode"],ranking[0]))
+                    qual_match = 0
+                    qual_value = -qual  # negative for descending sort (higher quality first)
             else:
-                ranking = sorted(ranking, key=lambda ranking: ranking[0])
-        
-        
-        hosterQueue = []
-        
-        for i, hoster in ranking:
-            hosterQueue.append(hoster)
-        return hosterQueue
+                # No quality info: sort after hosters with known quality
+                qual_match = 2
+                qual_value = 0
+
+            # 3) Resolver priority: ascending (lower = better)
+            res_prio = priority
+
+            return (lang, qual_match, qual_value, res_prio)
+
+        try:
+            ranking = sorted(ranking, key=sort_key)
+        except Exception as e:
+            logger.error('-> [hoster]: getPriorities sort error: %s' % e)
+
+        return [hoster for _, hoster in ranking]
 
     def stream(self, playMode, siteName, function, url):
         self.dialog = xbmcgui.DialogProgress()

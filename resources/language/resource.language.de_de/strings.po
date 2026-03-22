@@ -19,10 +19,6 @@ msgctxt "#30002"
 msgid "Preferred language"
 msgstr "Bevorzugte Sprache"
 
-msgctxt "#30003"
-msgid "Show XXX-Content for adult users"
-msgstr "XXX-Inhalte für volljährige Benutzer anzeigen"
-
 msgctxt "#30004"
 msgid "Use TMDB handler"
 msgstr "TMDB Handler verwenden"
@@ -235,9 +231,7 @@ msgctxt "#30081"
 msgid "Download-Folder"
 msgstr "Download-Verzeichnis"
 
-msgctxt "#30082"
-msgid "PyLoad on/off"
-msgstr "PyLoad an/aus"
+
 
 msgctxt "#30083"
 msgid "E-Mail"
@@ -352,16 +346,16 @@ msgid "No xStream update available."
 msgstr "Keine xStream Aktualisierung verfügbar."
 
 msgctxt "#30116"
-msgid " update installed successfully."
-msgstr " Aktualisierung erfolgreich installiert."
+msgid "ResolveURL update successful."
+msgstr "ResolveURL Update erfolgreich."
 
 msgctxt "#30117"
-msgid "Resolver update finished with errors."
-msgstr "Resolver Aktualisierung mit Fehlern beendet."
+msgid "ResolveURL update error."
+msgstr "Fehler bei ResolveURL Update."
 
 msgctxt "#30118"
-msgid "No Resolver update available."
-msgstr "Keine Resolver Aktualisierung verfügbar."
+msgid "No ResolveURL update available."
+msgstr "Kein ResolveURL Update verfügbar."
 
 msgctxt "#30119"
 msgid "ResolveUrl Error"
@@ -372,8 +366,8 @@ msgid "You don't have a working ResolveUrl installed, no videos can be played pl
 msgstr "Sie haben keinen funktionierenden ResolveUrl installiert, es können keine Videos abgespielt werden bitte installieren Sie den Resolver erneut."
 
 msgctxt "#30121"
-msgid "Start manual update"
-msgstr "Manuelle Aktualisierung starten"
+msgid "ResolveURL Update"
+msgstr "ResolveURL Update"
 
 msgctxt "#30122"
 msgid "xStream search started ..."
@@ -884,9 +878,7 @@ msgctxt "#30248"
 msgid "Send to My.JDownloader"
 msgstr "Sende zu My.JDownloader"
 
-msgctxt "#30250"
-msgid "Send to PyLoad"
-msgstr "Sende zu Pyload"
+
 
 msgctxt "#30251"
 msgid "Choose page"
@@ -912,9 +904,7 @@ msgctxt "#30256"
 msgid "Link sent"
 msgstr "Link gesendet"
 
-msgctxt "#30257"
-msgid "PyLoad"
-msgstr "PyLoad"
+
 
 msgctxt "#30258"
 msgid "Error sending link!"
@@ -1180,18 +1170,6 @@ msgctxt "#30406"
 msgid "Choose xStream Version"
 msgstr "Wähle xStream Version"
 
-msgctxt "#30407"
-msgid "Site-Plugins VoD"
-msgstr "Indexseiten VoD"
-
-msgctxt "#30408"
-msgid "VoD index pages"
-msgstr "Video on Demand Indexseiten"
-
-msgctxt "#30409"
-msgid "Enable VoD index pages"
-msgstr "Video on Demand Indexseiten aktivieren"
-
 msgctxt "#30410"
 msgid "Automatic update the domain"
 msgstr "Autom. Aktualisierung der Domain"
@@ -1379,8 +1357,8 @@ msgid "All Series"
 msgstr "Alle Serien"
 
 msgctxt "#30519"
-msgid "Popular Series"
-msgstr "Beliebte Serien"
+msgid "Popular Animes"
+msgstr "Beliebte Animes"
 
 msgctxt "#30520"
 msgid "Search"
@@ -1518,6 +1496,50 @@ msgctxt "#30553"
 msgid "Actors"
 msgstr "Schauspieler"
 
+msgctxt "#30554"
+msgid "New"
+msgstr "Neues"
+
+msgctxt "#30555"
+msgid "Trends"
+msgstr "Trends"
+
+msgctxt "#30556"
+msgid "Latest Seasons"
+msgstr "Neuste Staffeln"
+
+msgctxt "#30557"
+msgid "Latest Episodes"
+msgstr "Neuste Episoden"
+
+msgctxt "#30558"
+msgid ">>> Next Page"
+msgstr ">>> Nächste Seite"
+
+msgctxt "#30559"
+msgid "Specials"
+msgstr "Specials"
+
+msgctxt "#30560"
+msgid "Most Watched Right Now"
+msgstr "Meistgesehen gerade"
+
+msgctxt "#30561"
+msgid "New Animes"
+msgstr "Neue Animes"
+
+msgctxt "#30562"
+msgid "Recently added"
+msgstr "Kürzlich hinzugefügt"
+
+msgctxt "#30563"
+msgid "Enter year (e.g., 2017)"
+msgstr "Jahr eintragen (z.B., 2017)"
+
+msgctxt "#30564"
+msgid "Year"
+msgstr "Jahr"
+
 ############### Site Plugins ###############
 
 msgctxt "#30700"
@@ -1553,7 +1575,7 @@ msgid "Topstreamfilm"
 msgstr ""
 
 msgctxt "#30708"
-msgid "KinoX"
+msgid "FilmPro"
 msgstr ""
 
 msgctxt "#30709"
@@ -1636,24 +1658,6 @@ msgctxt "#30728"
 msgid "Moflix-Stream"
 msgstr ""
 
-############### VoD Plugins ###############
-
-msgctxt "#30790"
-msgid "Video on Demand Huhu"
-msgstr ""
-
-msgctxt "#30791"
-msgid "Video on Demand Kool"
-msgstr ""
-
-msgctxt "#30792"
-msgid "Video on Demand Oha"
-msgstr ""
-
-msgctxt "#30793"
-msgid "Video on Demand Vavoo"
-msgstr ""
-
 ############### Genre ###############
 
 msgctxt "#30800"
@@ -1708,6 +1712,26 @@ msgctxt "#30812"
 msgid "Western film"
 msgstr "Western"
 
+msgctxt "#30813"
+msgid "What's New"
+msgstr "Neues"
+
+msgctxt "#30814"
+msgid "A-Z"
+msgstr "A-Z"
+
+msgctxt "#30815"
+msgid "Genres"
+msgstr "Genres"
+
+msgctxt "#30816"
+msgid "All Genres"
+msgstr "Alle Genres"
+
+msgctxt "#30817"
+msgid "Popular Genres"
+msgstr "Beliebte Genres"
+
 msgctxt "#30818"
 msgid "Domain Check"
 msgstr "Domain Check"
@@ -1719,3 +1743,15 @@ msgstr "Überprüfe alle Provider-Domains..."
 msgctxt "#30820"
 msgid "Domain check completed!"
 msgstr "Domain Check abgeschlossen!"
+
+msgctxt "#30821"
+msgid "Changelog is empty"
+msgstr "Changelog ist leer"
+
+msgctxt "#30822"
+msgid "No Changelog available"
+msgstr "Kein Changelog verfügbar"
+
+msgctxt "#30823"
+msgid "No entry available in preferred language.[CR]Please change your preferred language in the xStream settings."
+msgstr "Kein Eintrag in bevorzugter Sprache verfügbar.[CR]Bitte ändern Sie Ihre bevorzugte Sprache in den xStream Einstellungen."

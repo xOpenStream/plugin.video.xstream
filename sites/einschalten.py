@@ -7,6 +7,7 @@
 # showEntries:    6 Stunden
 # showEpisodes:   4 Stunden
 
+import xbmcgui
 from resources.lib.handler.ParameterHandler import ParameterHandler
 from resources.lib.handler.requestHandler import cRequestHandler
 from resources.lib.tools import logger, cParser
@@ -38,6 +39,7 @@ URL_THUMBNAIL = URL_MAIN + '/api/image/poster'
 
 def load(): # Menu structure of the site plugin
     logger.info('Load %s' % SITE_NAME)
+    xbmcgui.Window(10000).clearProperty('xstream.einschalten.lastSearchText')
     params = ParameterHandler()
     params.setParam('sUrl', URL_NEW_MOVIES)
     cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30541), SITE_IDENTIFIER, 'showEntries'), params)  # New Movies
@@ -240,8 +242,13 @@ def getHosterUrl(sUrl=False):
 
 
 def showSearch():
-    sSearchText = cGui().showKeyBoard(sHeading=cConfig().getLocalizedString(30287))
-    if not sSearchText: return
+    # Check if we have a cached search text (e.g. coming back from playback)
+    win = xbmcgui.Window(10000)
+    sSearchText = win.getProperty('xstream.einschalten.lastSearchText')
+    if not sSearchText:
+        sSearchText = cGui().showKeyBoard(sHeading=cConfig().getLocalizedString(30287))
+        if not sSearchText: return
+        win.setProperty('xstream.einschalten.lastSearchText', sSearchText)
     _search(False, sSearchText)
     cGui().setEndOfDirectory()
 

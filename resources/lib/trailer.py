@@ -168,7 +168,7 @@ def _fetchHTML(url, timeout=10):
         req.add_header('User-Agent',
                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
                        'AppleWebKit/537.36 (KHTML, like Gecko) '
-                       'Chrome/120.0.0.0 Safari/537.36')
+                       'Chrome/146.0.0.0 Safari/537.36')
         req.add_header('Accept-Language', 'en-US,en;q=0.9')
         resp = urlopen(req, timeout=timeout)
         return resp.read().decode('utf-8', errors='replace')
@@ -729,7 +729,7 @@ def _searchIMDB(imdb_id):
         req.add_header('User-Agent',
                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
                        'AppleWebKit/537.36 (KHTML, like Gecko) '
-                       'Chrome/120.0.0.0 Safari/537.36')
+                       'Chrome/146.0.0.0 Safari/537.36')
         resp = urlopen(req, timeout=5)
         data = json.loads(resp.read().decode('utf-8'))
     except HTTPError as e:

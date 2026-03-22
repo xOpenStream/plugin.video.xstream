@@ -8,6 +8,7 @@
 
 import json
 
+import xbmcgui
 from resources.lib.handler.ParameterHandler import ParameterHandler
 from resources.lib.handler.requestHandler import cRequestHandler
 from resources.lib.tools import logger, cParser
@@ -40,6 +41,7 @@ URL_COLLECTIONS_LIST = {'Film Noir': 'Film_Noir', 'Feature Films': 'feature_film
 
 def load(): # Menu structure of the site plugin
     logger.info('Load %s' % SITE_NAME)
+    xbmcgui.Window(10000).clearProperty('xstream.internetarchive.lastSearchText')
     cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30543), SITE_IDENTIFIER, 'menuCollections'))  # Kollektionen
     cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30520), SITE_IDENTIFIER, 'showSearch'))   # Search
     cGui().setEndOfDirectory()
@@ -226,8 +228,13 @@ def getHosterUrl(sUrl=False):
 
 
 def showSearch():
-    sSearchText = cGui().showKeyBoard(sHeading=cConfig().getLocalizedString(30287))
-    if not sSearchText: return
+    # Check if we have a cached search text (e.g. coming back from playback)
+    win = xbmcgui.Window(10000)
+    sSearchText = win.getProperty('xstream.internetarchive.lastSearchText')
+    if not sSearchText:
+        sSearchText = cGui().showKeyBoard(sHeading=cConfig().getLocalizedString(30287))
+        if not sSearchText: return
+        win.setProperty('xstream.internetarchive.lastSearchText', sSearchText)
     _search(False, sSearchText)
     cGui().setEndOfDirectory()
 

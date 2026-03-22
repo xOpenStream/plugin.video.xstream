@@ -10,9 +10,11 @@
 # SSsearch:      24 Stunden
 
 
+import ast
 import json
 import locale
 
+import xbmcgui
 from resources.lib.handler.ParameterHandler import ParameterHandler
 from resources.lib.handler.requestHandler import cRequestHandler
 from resources.lib.tools import logger, cParser, cUtil
@@ -54,6 +56,7 @@ URL_GENRES = URL_MAIN + '/serie-genre'
 
 def load(): # Menu structure of the site plugin
     logger.info('Load %s' % SITE_NAME)
+    xbmcgui.Window(10000).clearProperty('xstream.burningseries.lastSearchText')
     params = ParameterHandler()
     params.setParam('sUrl', URL_NEW_SERIES)
     cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30514), SITE_IDENTIFIER, 'showNewSeries'), params)  # New Series
@@ -262,7 +265,7 @@ def showSeasons():
     total = len(aResult)
     for sNr, sUrl, sName in aResult:
         isMovie = sNr.startswith('0')
-        oGuiElement = cGuiElement('Staffel ' + sName, SITE_IDENTIFIER, 'showEpisodes')
+        oGuiElement = cGuiElement(cConfig().getLocalizedString(30512) + ' ' + sName, SITE_IDENTIFIER, 'showEpisodes')
         oGuiElement.setMediaType('season')
         if isThumbnail:
             oGuiElement.setThumbnail(sThumbnail)
@@ -361,7 +364,7 @@ def showHosters():
 
 
 def getHosterUrl(hUrl):
-    if type(hUrl) == str: hUrl = eval(hUrl)
+    if type(hUrl) == str: hUrl = ast.literal_eval(hUrl)
 
     Request = cRequestHandler(URL_MAIN + '/' + hUrl[0], caching=False)
     Request.addHeaderEntry('Referer', ParameterHandler().getValue('entryUrl'))
@@ -420,7 +423,7 @@ def getHosterUrl(hUrl):
         'sec-fetch-dest': 'empty',
         'sec-fetch-mode': 'cors',
         'sec-fetch-site': 'same-origin',
-        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
+        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
         'x-requested-with': 'XMLHttpRequest'
     }
 
@@ -455,8 +458,13 @@ def getHosterUrl(hUrl):
 
 
 def showSearch():
-    sSearchText = cGui().showKeyBoard(sHeading=cConfig().getLocalizedString(30281))
-    if not sSearchText: return
+    # Check if we have a cached search text (e.g. coming back from playback)
+    win = xbmcgui.Window(10000)
+    sSearchText = win.getProperty('xstream.burningseries.lastSearchText')
+    if not sSearchText:
+        sSearchText = cGui().showKeyBoard(sHeading=cConfig().getLocalizedString(30281))
+        if not sSearchText: return
+        win.setProperty('xstream.burningseries.lastSearchText', sSearchText)
     _search(False, sSearchText)
     cGui().setEndOfDirectory()
 

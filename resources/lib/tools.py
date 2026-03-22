@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Python 3
 
+import ast
 import xbmc
 import xbmcgui
 import hashlib
@@ -51,27 +52,20 @@ def platform():
 def changelog():
     CHANGELOG_PATH = translatePath(os.path.join('special://home/addons/' + cConfig().getAddonInfo('id') + '/', 'changelog.txt'))
     version = cConfig().getAddonInfo('version')
-    if cConfig().getSetting('changelog_version') == version or not os.path.isfile(CHANGELOG_PATH):
+    if cConfig().getSetting('changelog_version') == version:
+        return
+    # If changelog.txt doesn't exist, just skip silently
+    if not os.path.isfile(CHANGELOG_PATH):
+        cConfig().setSetting('changelog_version', version)
         return
     cConfig().setSetting('changelog_version', version)
-    heading = cConfig().getLocalizedString(30275)
     with open(CHANGELOG_PATH, mode='r', encoding='utf-8') as f:
-        cl_lines = f.readlines()
-    announce = ''
-    for line in cl_lines:
-        announce += line
-    textBox(heading, announce)
-
-
-# zeigt die Entwickler Optionen Warnung als Popup an
-def devWarning():
-    POPUP_PATH = translatePath(os.path.join('special://home/addons/' + cConfig().getAddonInfo('id') + '/resources/popup', 'devWarning.txt'))
-    heading = cConfig().getLocalizedString(30322)
-    with open(POPUP_PATH, mode='r', encoding='utf-8') as f:
-        cl_lines = f.readlines()
-    announce = ''
-    for line in cl_lines:
-        announce += line
+        announce = f.read()
+    # If changelog.txt is empty, show a notification instead of a textbox
+    if not announce.strip():
+        infoDialog(cConfig().getLocalizedString(30821), icon='INFO')
+        return
+    heading = cConfig().getLocalizedString(30275)
     textBox(heading, announce)
 
 
@@ -278,24 +272,20 @@ class cUtil:
 
     @staticmethod
     def unescape(text):
-        # edit kasi 2024-11-26 so für py2/py3 oder für nur py3 unichr ersetzen durch chr
-        try: unichr
-        except NameError: unichr = chr
-
         def fixup(m):
             text = m.group(0)
             if not text.endswith(';'): text += ';'
             if text[:2] == '&#':
                 try:
                     if text[:3] == '&#x':
-                        return unichr(int(text[3:-1], 16))
+                        return chr(int(text[3:-1], 16))
                     else:
-                        return unichr(int(text[2:-1]))
+                        return chr(int(text[2:-1]))
                 except ValueError:
                     pass
             else:
                 try:
-                    text = unichr(name2codepoint[text[1:-1]])
+                    text = chr(name2codepoint[text[1:-1]])
                 except KeyError:
                     pass
             return text
@@ -414,7 +404,7 @@ class cCache(object):
         cachedata = self._win.getProperty(key)
 
         if cachedata:
-            cachedata = eval(cachedata)
+            cachedata = ast.literal_eval(cachedata)
             if time.time() - cachedata[0] < cache_time or cache_time < 0:
                 return cachedata[1]
             else:

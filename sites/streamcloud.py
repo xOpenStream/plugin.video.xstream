@@ -7,6 +7,7 @@
 # showYears:     48 Stunden
 # showEpisodes:   4 Stunden
 
+import xbmcgui
 from resources.lib.handler.ParameterHandler import ParameterHandler
 from resources.lib.handler.requestHandler import cRequestHandler
 from resources.lib.tools import logger, cParser
@@ -24,12 +25,12 @@ if cConfig().getSetting('global_search_' + SITE_IDENTIFIER) == 'false':
     logger.info('-> [SitePlugin]: globalSearch for %s is deactivated.' % SITE_NAME)
 
 # Domain Abfrage
-DOMAIN = cConfig().getSetting('plugin_' + SITE_IDENTIFIER + '.domain', 'streamcloud.plus') # Domain Auswahl über die xStream Einstellungen möglich
+DOMAIN = cConfig().getSetting('plugin_' + SITE_IDENTIFIER + '.domain', 'streamcloud.my') # Domain Auswahl über die xStream Einstellungen möglich
 STATUS = cConfig().getSetting('plugin_' + SITE_IDENTIFIER + '_status') # Status Code Abfrage der Domain
 ACTIVE = cConfig().getSetting('plugin_' + SITE_IDENTIFIER) # Ob Plugin aktiviert ist oder nicht
 
 URL_MAIN = 'https://' + DOMAIN + '/'
-# URL_MAIN = 'https://streamcloud.plus/'
+# URL_MAIN = 'https://streamcloud.my'
 URL_MAINPAGE = URL_MAIN + 'streamcloud/'
 URL_MOVIES = URL_MAIN + 'filme-stream/'
 URL_KINO = URL_MAIN + 'kinofilme/'
@@ -43,6 +44,7 @@ URL_SEARCH = URL_MAIN + 'index.php?story=%s&do=search&subaction=search'
 #ToDo Serien auch auf reinen Filmseiten, prüfen ob Filterung möglich
 def load(): # Menu structure of the site plugin
     logger.info('Load %s' % SITE_NAME)
+    xbmcgui.Window(10000).clearProperty('xstream.streamcloud.lastSearchText')
     params = ParameterHandler()
     params.setParam('sUrl', URL_KINO)
     cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30501), SITE_IDENTIFIER, 'showEntries'), params)  # Current films in the cinema
@@ -291,8 +293,13 @@ def getHosterUrl(sUrl=False):
 
 
 def showSearch():
-    sSearchText = cGui().showKeyBoard(sHeading=cConfig().getLocalizedString(30287))
-    if not sSearchText: return
+    # Check if we have a cached search text (e.g. coming back from playback)
+    win = xbmcgui.Window(10000)
+    sSearchText = win.getProperty('xstream.streamcloud.lastSearchText')
+    if not sSearchText:
+        sSearchText = cGui().showKeyBoard(sHeading=cConfig().getLocalizedString(30287))
+        if not sSearchText: return
+        win.setProperty('xstream.streamcloud.lastSearchText', sSearchText)
     _search(False, sSearchText)
     cGui().setEndOfDirectory()
 

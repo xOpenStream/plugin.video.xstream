@@ -12,6 +12,7 @@
     
 # 2022-12-06 Heptamer - Suchfunktion überarbeitet
 
+import ast
 import xbmcgui
 
 from resources.lib.handler.ParameterHandler import ParameterHandler
@@ -40,6 +41,7 @@ URL_MAIN = 'https://' + DOMAIN
 URL_SERIES = URL_MAIN + '/animes'
 URL_POPULAR = URL_MAIN + '/beliebte-animes'
 URL_NEW_EPISODES = URL_MAIN + '/neue-episoden'
+URL_NEW_ANIMES = URL_MAIN          # "Neue Animes" Sektion liegt auf der Startseite
 URL_LOGIN = URL_MAIN + '/login'
 REFERER = 'https://' + DOMAIN
 
@@ -47,25 +49,139 @@ REFERER = 'https://' + DOMAIN
 
 def load(): # Menu structure of the site plugin
     logger.info('Load %s' % SITE_NAME)
+    xbmcgui.Window(10000).clearProperty('xstream.aniworld.lastSearchText')
     params = ParameterHandler()
     username = cConfig().getSetting('aniworld.user')    # Username
     password = cConfig().getSetting('aniworld.pass')    # Password
     if username == '' or password == '':                # If no username and password were set, close the plugin!
         xbmcgui.Dialog().ok(cConfig().getLocalizedString(30241), cConfig().getLocalizedString(30263))   # Info Dialog!
     else:
-        params.setParam('sUrl', URL_SERIES)
-        cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30518), SITE_IDENTIFIER, 'showAllSeries'), params)    # All Series
-        params.setParam('sUrl', URL_NEW_EPISODES)
-        cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30516), SITE_IDENTIFIER, 'showNewEpisodes'), params)  # New Episodes
+        # Neues  (Neue Animes + Neue Folgen)
+        cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30813), SITE_IDENTIFIER, 'showNeues'), params)
+        # Beliebte Animes
         params.setParam('sUrl', URL_POPULAR)
-        cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30519), SITE_IDENTIFIER, 'showEntries'), params)    # Popular Series
+        cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30519), SITE_IDENTIFIER, 'showEntries'), params)
+        # Genres (lädt direkt die Genre-Liste)
         params.setParam('sUrl', URL_MAIN)
-        params.setParam('sCont', 'catalogNav')
-        cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30517), SITE_IDENTIFIER, 'showValue'), params)    # From A-Z
         params.setParam('sCont', 'homeContentGenresList')
-        cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30506), SITE_IDENTIFIER, 'showValue'), params)    # Genre
-        cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30520), SITE_IDENTIFIER, 'showSearch'), params)   # Search
+        cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30815), SITE_IDENTIFIER, 'showValue'), params)
+        # A-Z    (Alle Serien + Von A-Z)
+        cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30814), SITE_IDENTIFIER, 'showAZMenu'), params)
+        # Suche
+        cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30520), SITE_IDENTIFIER, 'showSearch'), params)
         cGui().setEndOfDirectory()
+
+
+def showNeues():
+    """Submenu: Neue Animes + Neue Folgen"""
+    params = ParameterHandler()
+    # Neue Animes
+    params.setParam('sUrl', URL_NEW_ANIMES)
+    cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30561), SITE_IDENTIFIER, 'showNewAnimes'), params)  # New Animes
+    # Neue Folgen
+    params.setParam('sUrl', URL_NEW_EPISODES)
+    cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30516), SITE_IDENTIFIER, 'showNewEpisodes'), params)
+    cGui().setEndOfDirectory()
+
+
+def showAZMenu():
+    """Submenu: Alle Serien + Von A-Z"""
+    params = ParameterHandler()
+    # Alle Serien
+    params.setParam('sUrl', URL_SERIES)
+    cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30518), SITE_IDENTIFIER, 'showAllSeries'), params)
+    # Von A-Z
+    params.setParam('sUrl', URL_MAIN)
+    params.setParam('sCont', 'catalogNav')
+    cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30517), SITE_IDENTIFIER, 'showValue'), params)
+    cGui().setEndOfDirectory()
+
+
+def showNewAnimes(entryUrl=False, sGui=False):
+    """
+    Parst die "Neue Animes"-Sektion vom AniWorld Startseiten-Karussell.
+    HTML-Struktur:
+        <h2>Neue Animes</h2>
+        <div class="previews">
+            <div class="coverListItem">
+                <a href="/anime/stream/...">
+                    <img data-src="/public/img/cover/...">
+                    <h3>Titel <span ...></h3>
+                    <small>Genre</small>
+                </a>
+            </div>
+            ...
+        </div>
+        <div class="cf">   ← Ende der Sektion
+    """
+    oGui = sGui if sGui else cGui()
+    params = ParameterHandler()
+    if not entryUrl:
+        entryUrl = params.getValue('sUrl')
+
+    oRequest = cRequestHandler(entryUrl, ignoreErrors=(sGui is not False))
+    if cConfig().getSetting('global_search_' + SITE_IDENTIFIER) == 'true':
+        oRequest.cacheTime = 60 * 60 * 6  # HTML Cache 6 Stunden
+
+    sHtmlContent = oRequest.request()
+    if not sHtmlContent:
+        if not sGui: oGui.showInfo()
+        return
+
+    # --- Sektion isolieren: alles zwischen "Neue Animes" Heading und <div class="cf"> ---
+    isMatch, sContainer = cParser.parseSingleResult(
+        sHtmlContent,
+        r'Neue Animes<\/h2>.*?<div class="previews">(.*?)<\/div>\s*<\/div>\s*<div class="cf">'
+    )
+    if not isMatch:
+        logger.info('[%s] showNewAnimes: Neue-Animes-Sektion nicht gefunden.' % SITE_NAME)
+        if not sGui: oGui.showInfo()
+        return
+
+    # --- Jedes coverListItem parsen: URL + Thumbnail (data-src) + Titel + Genre ---
+    # Beispiel-Item:
+    #   <div class="coverListItem"><a href="/anime/stream/rooster-fighter" title="...">
+    #       ...
+    #       <img data-src="/public/img/cover/rooster-fighter-stream-cover-xxx_150x225.png" ...>
+    #       ...
+    #       <h3>Rooster Fighter <span class="paragraph-end black"></span></h3>
+    #       <small>Action</small>
+    #   </a></div>
+    pattern = (
+        r'<div class="coverListItem"><a href="(/anime/stream/[^"]+)"[^>]*>'  # URL
+        r'.*?data-src="([^"]+)"[^>]*>'                                        # Thumbnail
+        r'.*?<h3>([^<]+)<span'                                                # Titel
+        r'.*?<small>([^<]*)<\/small>'                                         # Genre
+    )
+    isMatch, aResult = cParser.parse(sContainer, pattern)
+    if not isMatch:
+        logger.info('[%s] showNewAnimes: Keine Items im Container gefunden.' % SITE_NAME)
+        if not sGui: oGui.showInfo()
+        return
+
+    total = len(aResult)
+    for sUrl, sThumbnail, sName, sGenre in aResult:
+        sName = sName.strip()
+        sGenre = sGenre.strip()
+        if not sName:
+            continue
+        sThumbnail = sThumbnail if sThumbnail.startswith('http') else URL_MAIN + sThumbnail
+        sFullUrl = URL_MAIN + sUrl
+
+        oGuiElement = cGuiElement(sName, SITE_IDENTIFIER, 'showSeasons')
+        oGuiElement.setMediaType('tvshow')
+        oGuiElement.setTVShowTitle(sName)
+        oGuiElement.setThumbnail(sThumbnail)
+        if sGenre:
+            oGuiElement.setDescription('[B]Genre:[/B] ' + sGenre)
+
+        params.setParam('sUrl', sFullUrl)
+        params.setParam('TVShowTitle', sName)
+        oGui.addFolder(oGuiElement, params, True, total)
+
+    if not sGui:
+        oGui.setView('tvshows')
+        oGui.setEndOfDirectory()
 
 
 def showValue():
@@ -213,7 +329,7 @@ def showSeasons():
     for sUrl, sName, sNr in aResult:
         isMovie = sUrl.endswith('filme')
         if 'Alle Filme' in sName:
-            sName = 'Filme'
+            sName = cConfig().getLocalizedString(30502)
         oGuiElement = cGuiElement(sName, SITE_IDENTIFIER, 'showEpisodes')
         oGuiElement.setMediaType('season' if not isMovie else 'movie')
         if isThumbnail:
@@ -400,7 +516,7 @@ def showHosters():
 
 
 def getHosterUrl(hUrl):
-    if type(hUrl) == str: hUrl = eval(hUrl)
+    if type(hUrl) == str: hUrl = ast.literal_eval(hUrl)
     username = cConfig().getSetting('aniworld.user')
     password = cConfig().getSetting('aniworld.pass')
     Handler = cRequestHandler(URL_LOGIN, caching=False)
@@ -425,8 +541,13 @@ def getHosterUrl(hUrl):
 
 
 def showSearch():
-    sSearchText = cGui().showKeyBoard(sHeading=cConfig().getLocalizedString(30281))
-    if not sSearchText: return
+    # Check if we have a cached search text (e.g. coming back from playback)
+    win = xbmcgui.Window(10000)
+    sSearchText = win.getProperty('xstream.aniworld.lastSearchText')
+    if not sSearchText:
+        sSearchText = cGui().showKeyBoard(sHeading=cConfig().getLocalizedString(30281))
+        if not sSearchText: return
+        win.setProperty('xstream.aniworld.lastSearchText', sSearchText)
     _search(False, sSearchText)
     cGui().setEndOfDirectory()
 

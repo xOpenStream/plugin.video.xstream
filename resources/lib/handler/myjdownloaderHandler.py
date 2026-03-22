@@ -14,19 +14,30 @@ class cMyJDownloaderHandler:
             cGui().showError(cConfig().getLocalizedString(30090), cConfig().getLocalizedString(30254), 5)
             return False
 
-        jd = myjdapi.Myjdapi()
-        if jd.connect(self.__getUser(), self.__getPass()) == False:
+        try:
+            jd = myjdapi.Myjdapi()
+            jd.connect(self.__getUser(), self.__getPass())
+        except Exception as e:
+            log(cConfig().getLocalizedString(30166) + ' -> [myjdownloaderHandler]: connect failed: %s' % str(e), LOGNOTICE)
             cGui().showError(cConfig().getLocalizedString(30090), cConfig().getLocalizedString(30255), 5)
             return False
 
-        if jd.update_devices() == False:
+        try:
+            jd.update_devices()
+        except Exception as e:
+            log(cConfig().getLocalizedString(30166) + ' -> [myjdownloaderHandler]: update_devices failed: %s' % str(e), LOGNOTICE)
             cGui().showError(cConfig().getLocalizedString(30090), cConfig().getLocalizedString(30256), 5)
             return False
 
-        device = jd.get_device(self.__getDevice())
-        if device.linkgrabber.add_links([{"autostart": False, "links": sUrl, "packageName": sMovieTitle}])['id'] > 0:
-            cGui().showInfo(cConfig().getLocalizedString(30090), cConfig().getLocalizedString(30256), 5)
-            return True
+        try:
+            device = jd.get_device(self.__getDevice())
+            result = device.linkgrabber.add_links([{"autostart": False, "links": sUrl, "packageName": sMovieTitle}])
+            if result and result.get('id', 0) > 0:
+                cGui().showInfo(cConfig().getLocalizedString(30090), cConfig().getLocalizedString(30256), 5)
+                return True
+        except Exception as e:
+            log(cConfig().getLocalizedString(30166) + ' -> [myjdownloaderHandler]: send failed: %s' % str(e), LOGNOTICE)
+            cGui().showError(cConfig().getLocalizedString(30090), cConfig().getLocalizedString(30256), 5)
         return False
 
     def __checkConfig(self):

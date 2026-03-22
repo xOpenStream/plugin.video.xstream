@@ -18,7 +18,7 @@ except ImportError:
 from urllib.parse import quote
 
 
-class MYJDException(BaseException):
+class MYJDException(Exception):
     pass
 
 

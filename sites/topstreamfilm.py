@@ -7,6 +7,7 @@
 # showEntries:    6 Stunden
 # showEpisodes:   4 Stunden
     
+import xbmcgui
 from resources.lib.handler.ParameterHandler import ParameterHandler
 from resources.lib.handler.requestHandler import cRequestHandler
 from resources.lib.tools import logger, cParser
@@ -41,21 +42,22 @@ URL_SEARCH = URL_MAIN + '/?story=%s&do=search&subaction=search'
 
 def load(): # Menu structure of the site plugin
     logger.info('Load %s' % SITE_NAME)
+    xbmcgui.Window(10000).clearProperty('xstream.topstreamfilm.lastSearchText')
     params = ParameterHandler()
-    params.setParam('sUrl', URL_ALL)
-    cGui().addFolder(cGuiElement('Alle Filme', SITE_IDENTIFIER, 'showEntries'), params)
-    params.setParam('sUrl', URL_MOVIES)
-    cGui().addFolder(cGuiElement('Kürzlich hinzugefügt', SITE_IDENTIFIER, 'showEntries'), params)  # Neue Uploads
     params.setParam('sUrl', URL_KINO)
-    cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30501), SITE_IDENTIFIER, 'showEntries'), params)  # Kinofilme
+    cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30501), SITE_IDENTIFIER, 'showEntries'), params)  # Aktuelle Filme im Kino
+    params.setParam('sUrl', URL_MOVIES)
+    cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30562), SITE_IDENTIFIER, 'showEntries'), params)  # Recently added
+    params.setParam('sUrl', URL_ALL)
+    cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30542), SITE_IDENTIFIER, 'showEntries'), params)  # All Movies
     params.setParam('Value', 'KATEGORIEN')
     cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30506), SITE_IDENTIFIER, 'showValue'), params)    # Genre
     params.setParam('Value', 'LAND')
-    cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30538), SITE_IDENTIFIER, 'showValue'), params)  # Country
-    cGui().addFolder(cGuiElement('Jahr', SITE_IDENTIFIER, 'showYearSearch'))  # New Year entry
+    cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30538), SITE_IDENTIFIER, 'showValue'), params)  # Land
+    cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30564), SITE_IDENTIFIER, 'showYearSearch'))  # Year
     params.setParam('sUrl', URL_SERIES)
-    cGui().addFolder(cGuiElement('Serien', SITE_IDENTIFIER, 'showEntries'), params)
-    cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30520), SITE_IDENTIFIER, 'showSearch'), params)   # Search
+    cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30511), SITE_IDENTIFIER, 'showEntries'), params)  # Series
+    cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30520), SITE_IDENTIFIER, 'showSearch'), params)   # Suche
     cGui().setEndOfDirectory()
 
 
@@ -184,7 +186,7 @@ def showSeasons():
         return
     total = len(aResult)
     for sSeason in aResult:
-        oGuiElement = cGuiElement('Staffel ' + str(sSeason), SITE_IDENTIFIER, 'showEpisodes')
+        oGuiElement = cGuiElement(cConfig().getLocalizedString(30512) + ' ' + str(sSeason), SITE_IDENTIFIER, 'showEpisodes')
         oGuiElement.setSeason(sSeason)
         oGuiElement.setMediaType('season')
         oGuiElement.setThumbnail(sThumbnail)
@@ -216,7 +218,7 @@ def showEpisodes():
 
     total = len(aResult)
     for sEpisode in aResult:
-        oGuiElement = cGuiElement('Episode ' + str(sEpisode), SITE_IDENTIFIER, 'showEpisodeHosters')
+        oGuiElement = cGuiElement(cConfig().getLocalizedString(30513) + ' ' + str(sEpisode), SITE_IDENTIFIER, 'showEpisodeHosters')
         oGuiElement.setThumbnail(sThumbnail)
         if isDesc:
             oGuiElement.setDescription(isDesc)
@@ -291,8 +293,13 @@ def getHosterUrl(sUrl=False):
 
 
 def showSearch():
-    sSearchText = cGui().showKeyBoard(sHeading=cConfig().getLocalizedString(30281))
-    if not sSearchText: return
+    # Check if we have a cached search text (e.g. coming back from playback)
+    win = xbmcgui.Window(10000)
+    sSearchText = win.getProperty('xstream.topstreamfilm.lastSearchText')
+    if not sSearchText:
+        sSearchText = cGui().showKeyBoard(sHeading=cConfig().getLocalizedString(30281))
+        if not sSearchText: return
+        win.setProperty('xstream.topstreamfilm.lastSearchText', sSearchText)
     _search(False, sSearchText)
     cGui().setEndOfDirectory()
 
@@ -315,7 +322,7 @@ def showSearchPage(): # Suche für die Page Funktion
 
 
 def showYearSearch():
-    sYear = cGui().showKeyBoard(sHeading="Jahr eintragen (z.B., 2017)")
+    sYear = cGui().showKeyBoard(sHeading=cConfig().getLocalizedString(30563))
     if not sYear: return
     searchUrl = URL_MAIN + '/xfsearch/' + sYear
     showEntries(searchUrl)

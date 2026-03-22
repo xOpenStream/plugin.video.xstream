@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 # Python 3
 
@@ -97,22 +98,12 @@ class cGui:
         if infoString:
             infoString = '[I]%s[/I]' % infoString
         itemValues['title'] = itemTitle + infoString
-        try:
-            if not 'plot' in str(itemValues) or itemValues['plot'] == '':
-                itemValues['plot'] = ' ' #kasi Alt 255
-        except:
-            pass
+        if 'plot' not in itemValues or itemValues['plot'] == '':
+            itemValues['plot'] = ' ' #kasi Alt 255
         #listitem = xbmcgui.ListItem(itemTitle + infoString, oGuiElement.getIcon(), oGuiElement.getThumbnail())
         listitem = xbmcgui.ListItem(itemTitle + infoString)
-        # Function: setInfo(type, infoLabels)
-        # listitem.setInfo('video', { 'genre': 'Comedy' })
-        listitem.setInfo(oGuiElement.getType(), itemValues)
-        #Wenn Kodi 19, dann ignoriere setinfotagvideo
-        kodi_version = xbmc.getInfoLabel('System.BuildVersion')
-        if kodi_version[:2]  > '19':
-            self.setInfoTagVideo(oGuiElement, listitem)
+        self.setInfoTagVideo(oGuiElement, listitem)
 
-        listitem.setProperty('fanart_image', oGuiElement.getFanart())
         listitem.setArt({'icon': oGuiElement.getIcon(), 'thumb': oGuiElement.getThumbnail(), 'poster': oGuiElement.getThumbnail(), 'fanart': oGuiElement.getFanart()})
         aProperties = oGuiElement.getItemProperties()
         if len(aProperties) > 0:
@@ -420,9 +411,5 @@ class cGui:
         xbmc.executebuiltin("Notification(%s,%s,%s,%s)" % (str(sTitle), (str(sDescription)), iSeconds, cConfig().getAddonInfo('icon')))
 
     @staticmethod
-    def showLanguage(sTitle='xStream', sDescription=cConfig().getLocalizedString(30403), iSeconds=0):
-        if iSeconds == 0:
-            iSeconds = 1000
-        else:
-            iSeconds = iSeconds * 1000
-        xbmc.executebuiltin("Notification(%s,%s,%s,%s)" % (str(sTitle), (str(sDescription)), iSeconds, cConfig().getAddonInfo('icon')))
+    def showLanguage():
+        xbmcgui.Dialog().ok('xStream', cConfig().getLocalizedString(30823))
