@@ -1,0 +1,49 @@
+name: Update version on merge to nightly
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - nightly
+
+jobs:
+  update-version:
+    if: github.event.pull_request.merged == true
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout the nightly branch
+        uses: actions/checkout@v4
+        with:
+          ref: nightly
+
+      - name: Set version attribute to current date (YYYY-MM-DD)
+        run: |
+          python3 - << 'EOF'
+          import os
+          from datetime import date
+          import xml.etree.ElementTree as ET
+          path = "addon.xml"
+          if not os.path.exists(path):
+              print("Fehler: addon.xml nicht gefunden!")
+              exit(1)
+          tree = ET.parse(path)
+          root = tree.getroot()
+          today = date.today().isoformat()
+          old_version = root.attrib.get('version', 'nicht vorhanden')
+          root.attrib['version'] = today
+          tree.write(path, encoding="utf-8", xml_declaration=True)
+          print(f"Version geändert: {old_version} : {today}")
+          EOF
+
+      - name: Commit and push version update
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: set version to current date after merge to nightly"
+          file_pattern: addon.xml
+          branch: nightly
+          skip_fetch: false
+          skip_dirty_check: false
