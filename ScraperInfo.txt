@@ -10,7 +10,7 @@ from resources.lib.gui.guiElement import cGuiElement
 from resources.lib.config import cConfig
 from resources.lib.gui.gui import cGui
 
-----------------------------------------------------------------------------
+---------------------------------------------------------------------------
 
 # Namen für Quellen
 
