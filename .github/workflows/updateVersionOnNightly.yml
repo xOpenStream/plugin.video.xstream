@@ -15,10 +15,11 @@ jobs:
       contents: write
 
     steps:
-      - name: Checkout the nightly branch
+      - name: Checkout the nightly branch with custom token
         uses: actions/checkout@v4
         with:
           ref: nightly
+          token: ${{ secrets.NIGHTLY_PAT }}
 
       - name: Set version attribute to current date (YYYY-MM-DD)
         run: |
@@ -33,10 +34,10 @@ jobs:
           tree = ET.parse(path)
           root = tree.getroot()
           today = date.today().isoformat()
-          old_version = root.attrib.get('version', 'nicht vorhanden')
+          old = root.attrib.get('version', 'unbekannt')
           root.attrib['version'] = today
           tree.write(path, encoding="utf-8", xml_declaration=True)
-          print(f"Version geändert: {old_version} : {today}")
+          print(f"Version geändert: {old} > {today}")
           EOF
 
       - name: Commit and push version update
@@ -45,5 +46,3 @@ jobs:
           commit_message: "chore: set version to current date after merge to nightly"
           file_pattern: addon.xml
           branch: nightly
-          skip_fetch: false
-          skip_dirty_check: false
