@@ -1,0 +1,36 @@
+name: Protect Workflow Changes
+
+on:
+  pull_request:
+    branches: [nightly, main]
+    types: [opened, synchronize, reopened]
+
+permissions: {}
+
+jobs:
+  check-workflow-changes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed files
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          base: ${{ github.base_ref }}
+          filters: |
+            workflows:
+              - '.github/workflows/**'
+
+      - name: Fail if workflows were changed
+        if: steps.filter.outputs.workflows == 'true'
+        run: |
+          echo "::error title=Protected path::Changed .github/workflows/ requires admin review."
+          exit 1
+
+      - name: Summary (optional – nur Info)
+        if: always()
+        run: |
+          echo "Workflow-Protection-Check: ${{ job.status }}"

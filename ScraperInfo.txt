@@ -10,7 +10,7 @@ from resources.lib.gui.guiElement import cGuiElement
 from resources.lib.config import cConfig
 from resources.lib.gui.gui import cGui
 
-----------------------------------------------------------------------------
+---------------------------------------------------------------------------
 
 # Namen für Quellen
 
@@ -60,7 +60,7 @@ URL_DOKU = URL_MAIN + 			''
 		cGui().addFolder(cGuiElement('Aktuelle Kinofilme', SITE_IDENTIFIER, 'showEntries'), params) # cConfig().getLocalizedString(30500) setzen für den jeweiligen Eintrag
 		cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30500), SITE_IDENTIFIER, 'showEntries'), params)
 		
-----------------------------------------------------------------------------
+---------------------------------------------------------------------------
 
 # Einbau der Qualitätfunktion in Indexseiten		
 	
