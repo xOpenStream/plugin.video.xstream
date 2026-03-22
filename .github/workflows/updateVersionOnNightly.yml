@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Checkout the nightly branch with custom token
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: nightly
           token: ${{ secrets.NIGHTLY_PAT }}
@@ -41,7 +41,7 @@ jobs:
           EOF
 
       - name: Commit and push version update
-        uses: stefanzweifel/git-auto-commit-action@v5
+        uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: "chore: set version to current date after merge to nightly"
           file_pattern: addon.xml
