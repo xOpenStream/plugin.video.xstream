@@ -4,6 +4,7 @@
 import os
 import xbmc
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 from resources.lib.config import cConfig
 from resources.lib import tools
@@ -36,19 +37,37 @@ def delHtmlCache():
         cConfig().setSetting('lastdelhtml', str(currentTime))
 
 
+def _resolverUpdate():
+    """Resolver Update im Hintergrund - gibt Status zurück für Notification."""
+    try:
+        if not os.path.isfile(RESOLVE_SHA) or cConfig().getSetting('githubUpdateResolver') == 'true' or cConfig().getSetting('enforceUpdate') == 'true':
+            status = updateManager.resolverUpdate()
+            if cConfig().getSetting('enforceUpdate') == 'true':
+                cConfig().setSetting('enforceUpdate', 'false')
+            return status
+    except Exception:
+        import traceback
+        log(cConfig().getLocalizedString(30166) + ' -> [xstream]: Resolver update error: %s' % traceback.format_exc(), LOGERROR)
+        return False
+    return 'skipped'
+
+
 def main():
     cCache().set(cConfig().getAddonInfo('id') + '_main', 'running')
 
-    # Starte Resolver Update wenn auf Github verfügbar
-    if os.path.isfile(RESOLVE_SHA) == False or cConfig().getSetting('githubUpdateResolver') == 'true'  or cConfig().getSetting('enforceUpdate') == 'true':
-        status2 = updateManager.resolverUpdate(True)
-        if status2 == True: infoDialog(cConfig().getLocalizedString(30116), sound=False, icon='INFO', time=6000)
-        if status2 == False: infoDialog(cConfig().getLocalizedString(30117), sound=True, icon='ERROR')
-        if status2 == None: infoDialog(cConfig().getLocalizedString(30118), sound=False, icon='INFO', time=6000)
-        if cConfig().getSetting('enforceUpdate') == 'true': cConfig().setSetting('enforceUpdate', 'false')
+    # Resolver Update und Domain Check parallel starten
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        # Resolver läuft im Hintergrund
+        resolver_future = executor.submit(_resolverUpdate)
 
-    # Startet Domain Überprüfung und schreibt diese in die settings.xml
-    cPluginHandler().checkDomain()
+        # Domain Check läuft gleichzeitig im Main Thread
+        cPluginHandler().checkDomain()
+
+        # Warte auf Resolver (falls noch nicht fertig, max 10 Sek)
+        try:
+            resolver_status = resolver_future.result(timeout=10)
+        except Exception:
+            resolver_status = False
 
     # Wenn neue settings vorhanden oder geändert in addon_data dann starte Pluginhandler und aktualisiere die PluginDB um Daten von checkDomain mit aufzunehmen
     try:
@@ -59,6 +78,13 @@ def main():
 
     # getAvailablePlugins must be finished before the main menu can be started!
     cCache().set(cConfig().getAddonInfo('id') + '_main', 'finished')
+
+    # Resolver Notification (nach Domain Check damit sich Notifications nicht überschneiden)
+    # Nur anzeigen wenn ein Update Check tatsächlich stattfand (nicht 'skipped')
+    if resolver_status != 'skipped':
+        if resolver_status == True: infoDialog(cConfig().getLocalizedString(30116), sound=False, icon='INFO', time=6000)
+        if resolver_status == False: infoDialog(cConfig().getLocalizedString(30117), sound=True, icon='ERROR')
+        if resolver_status == None: infoDialog(cConfig().getLocalizedString(30118), sound=False, icon='INFO', time=6000)
 
     # Changelog Popup in den "settings.xml" ein bzw. aus schaltbar
     if cConfig().getSetting('popup.update.notification') == 'true':

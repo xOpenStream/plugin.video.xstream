@@ -21,7 +21,7 @@ def WindowsBoxes(sTitle, sFileName, metaType, year=''):
         except Exception:
             pass
     except Exception:
-        print("TMDB - error")
+        logger.error("TMDB - error")
         pass
 
     if 'tmdb_id' not in meta:
