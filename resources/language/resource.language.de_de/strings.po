@@ -1156,7 +1156,7 @@ msgstr "Länder"
 
 msgctxt "#30403"
 msgid "No entry available in the selected language!"
-msgstr "Kein Eintrag in der ausgewählten Sprache verfügbar!"
+msgstr "Kein Inhalt in der ausgewählten Sprache verfügbar!"
 
 msgctxt "#30404"
 msgid "Exclude specific hosters (separate with a comma)"
@@ -1754,4 +1754,4 @@ msgstr "Kein Changelog verfügbar"
 
 msgctxt "#30823"
 msgid "No entry available in preferred language.[CR]Please change your preferred language in the xStream settings."
-msgstr "Kein Eintrag in bevorzugter Sprache verfügbar.[CR]Bitte ändern Sie Ihre bevorzugte Sprache in den xStream Einstellungen."
+msgstr "Dieser Inhalt ist nicht in Ihrer bevorzugten Sprache verfügbar.[CR]Bitte ändern Sie Ihre bevorzugte Sprache in den xStream Einstellungen."

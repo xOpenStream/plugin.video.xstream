@@ -192,8 +192,8 @@ def showMainMenu(sFunction):
     ART = os.path.join(cConfig().getAddonInfo('path'), 'resources', 'art')
     addon_id = cConfig().getAddonInfo('id')
     start_time = time.time()
-    # timeout for the startup status check = 3s
-    while (startupStatus := cCache().get(addon_id + '_main', -1)) != 'finished' and time.time() - start_time <= 5:
+    # timeout for the startup status check  to make sure all is done
+    while (startupStatus := cCache().get(addon_id + '_main', -1)) != 'finished' and time.time() - start_time <= 25:
         time.sleep(0.2)
     
     # Clear cached search texts so next search opens fresh keyboard

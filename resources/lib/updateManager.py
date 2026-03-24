@@ -8,14 +8,14 @@ import requests
 import zipfile
 
 from requests.auth import HTTPBasicAuth
-from xbmcgui import Dialog
 from resources.lib.config import cConfig
+from resources.lib.tools import infoDialog
 from xbmc import LOGINFO as LOGNOTICE, LOGERROR, LOGWARNING, log, executebuiltin
 from xbmcvfs import translatePath
 
 
 # Resolver
-def resolverUpdate(silent=False):
+def resolverUpdate():
     # Release Branch https://github.com/Gujal00/ResolveURL
     username = 'Gujal00'
     resolve_dir = 'ResolveURL'
@@ -24,15 +24,14 @@ def resolverUpdate(silent=False):
     token = ''
 
     try:
-        return UpdateResolve(username, resolve_dir, resolve_id, branch, token, silent)
+        return UpdateResolve(username, resolve_dir, resolve_id, branch, token)
     except Exception as e:
         log(' -> [updateManager]: Exception Raised: %s' % str(e), LOGERROR)
-        Dialog().ok(cConfig().getLocalizedString(30151), cConfig().getLocalizedString(30156) + resolve_id + cConfig().getLocalizedString(30157))
-        return
+        return False
 
 
 # Update Resolver
-def UpdateResolve(username, resolve_dir, resolve_id, branch, token, silent):
+def UpdateResolve(username, resolve_dir, resolve_id, branch, token):
     REMOTE_PLUGIN_COMMITS = "https://api.github.com/repos/%s/%s/commits/%s" % (username, resolve_dir, branch)   # Github Commits
     REMOTE_PLUGIN_DOWNLOADS = "https://api.github.com/repos/%s/%s/zipball/%s" % (username, resolve_dir, branch) # Github Downloads
     PACKAGES_PATH = translatePath(os.path.join('special://home/addons/packages/'))  # Packages Ordner für Downloads
@@ -52,30 +51,27 @@ def UpdateResolve(username, resolve_dir, resolve_id, branch, token, silent):
             
         commitXML = _getXmlString(REMOTE_PLUGIN_COMMITS, auth)  # Commit Update
         if commitXML:
-            isTrue = commitUpdate(commitXML, LOCAL_PLUGIN_VERSION, REMOTE_PLUGIN_DOWNLOADS, PACKAGES_PATH, resolve_dir, LOCAL_FILE_NAME_PLUGIN, silent, auth)
+            isTrue = commitUpdate(commitXML, LOCAL_PLUGIN_VERSION, REMOTE_PLUGIN_DOWNLOADS, PACKAGES_PATH, resolve_dir, LOCAL_FILE_NAME_PLUGIN, auth)
             
             if isTrue is True:
                 log(cConfig().getLocalizedString(30166) + ' -> [updateManager]: %s: - download new update.' % resolve_id, LOGNOTICE)
                 shutil.make_archive(ADDON_PATH, 'zip', ADDON_PATH)
                 shutil.unpack_archive(ADDON_PATH + '.zip', INSTALL_PATH)
                 log(cConfig().getLocalizedString(30166) + ' -> [updateManager]: %s: - install new update.' % resolve_id, LOGNOTICE)
-                if os.path.exists(ADDON_PATH + '.zip'): os.remove(ADDON_PATH + '.zip')                
-                if silent is False: Dialog().ok(cConfig().getLocalizedString(30166), cConfig().getLocalizedString(30158) + resolve_id + cConfig().getLocalizedString(30159))
+                if os.path.exists(ADDON_PATH + '.zip'): os.remove(ADDON_PATH + '.zip')
                 log(cConfig().getLocalizedString(30166) + ' -> [updateManager]: %s: - update completed.' % resolve_id, LOGNOTICE)
                 return True
             elif isTrue is None:
                 log(cConfig().getLocalizedString(30166) + ' -> [updateManager]: %s: - no update available.' % resolve_id, LOGNOTICE)
-                if silent is False: Dialog().ok(cConfig().getLocalizedString(30151), cConfig().getLocalizedString(30160) + resolve_id + cConfig().getLocalizedString(30161))
                 return None
 
         log(cConfig().getLocalizedString(30166) + ' -> [updateManager]: %s: - Error updating!' % resolve_id, LOGERROR)
-        Dialog().ok(cConfig().getLocalizedString(30151), cConfig().getLocalizedString(30156) + resolve_id + cConfig().getLocalizedString(30157))
         return False
     except:
         log(cConfig().getLocalizedString(30166) + ' -> [updateManager]: %s: - Error updating!' % resolve_id, LOGERROR)
-        Dialog().ok(cConfig().getLocalizedString(30151), cConfig().getLocalizedString(30156) + resolve_id + cConfig().getLocalizedString(30157))
+        return False
 
-def commitUpdate(onlineFile, offlineFile, downloadLink, LocalDir, plugin_id, localFileName, silent, auth):
+def commitUpdate(onlineFile, offlineFile, downloadLink, LocalDir, plugin_id, localFileName, auth):
     try:
         jsData = json.loads(onlineFile)
         if not os.path.exists(offlineFile) or open(offlineFile).read() != jsData['sha']:
@@ -99,7 +95,7 @@ def commitUpdate(onlineFile, offlineFile, downloadLink, LocalDir, plugin_id, loc
 
 def doUpdate(LocalDir, REMOTE_PATH, Title, localFileName, auth):
     try:
-        response = requests.get(REMOTE_PATH, auth=auth)  # verify=False,
+        response = requests.get(REMOTE_PATH, auth=auth, timeout=10)  # verify=False,
         if response.status_code == 200:
             open(localFileName, "wb").write(response.content)
         else:
@@ -146,7 +142,7 @@ def removeFilesNotInRepo(updateFile, LocalDir):
 
 def _getXmlString(xml_url, auth):
     try:
-        xmlString = requests.get(xml_url, auth=auth).content  # verify=False,
+        xmlString = requests.get(xml_url, auth=auth, timeout=10).content  # verify=False,
         if "sha" in json.loads(xmlString):
             return xmlString
         else:
@@ -168,17 +164,11 @@ def zipfolder(foldername, target_dir):
 
 def devUpdates():  # für manuelles Updates vorgesehen
     try:
-        # Resolver Release Update
         cConfig().setSetting('resolver.branch', 'release')
-
-        # Update direkt ausführen
-        try:
-            resolverUpdate(False)
-        except:
-            pass
-
-        # Zurücksetzten der Update.sha
+        status = resolverUpdate()
+        if status == True:  infoDialog(cConfig().getLocalizedString(30116), sound=False, icon='INFO', time=6000)
+        if status == False: infoDialog(cConfig().getLocalizedString(30117), sound=True, icon='ERROR')
+        if status == None:  infoDialog(cConfig().getLocalizedString(30118), sound=False, icon='INFO', time=6000)
         if cConfig().getSetting('enforceUpdate') == 'true': cConfig().setSetting('enforceUpdate', 'false')
-        return
     except Exception as e:
         log(e)

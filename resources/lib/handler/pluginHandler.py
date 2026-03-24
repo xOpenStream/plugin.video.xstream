@@ -593,7 +593,8 @@ class cPluginHandler:
             t.join()
 
         log(cConfig().getLocalizedString(30166) + ' -> [checkDomain]: Domains for all available Plugins updated', LOGNOTICE)
-        infoDialog(cConfig().getLocalizedString(30820), sound=False, icon='INFO', time=6000)
+        if threads:
+            infoDialog(cConfig().getLocalizedString(30820), sound=False, icon='INFO', time=6000)
 
 
     def _checkdomain(self, provider, base_link):
