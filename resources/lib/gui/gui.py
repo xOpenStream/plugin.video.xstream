@@ -55,7 +55,7 @@ class cGui:
             else:
                 oGuiElement.getMeta(oGuiElement._mediaType, mode=self.metaMode)
         sUrl = self.__createItemUrl(oGuiElement, bIsFolder, params)
-#kasi
+
         try:
             if params.exist('trumb'): oGuiElement.setIcon(params.getValue('trumb'))
         except:
@@ -284,7 +284,7 @@ class cGui:
         # listitem.addContextMenuItems(contextmenus, True)
         return listitem
 
-    def setEndOfDirectory(self, success=True):
+    def setEndOfDirectory(self, success=True, pUpdateListing=False, pCacheToDisc=True):
         # mark the listing as completed, this is mandatory
         if not self._isViewSet:
             self.setView('files')
@@ -297,7 +297,8 @@ class cGui:
         xbmcplugin.addSortMethod(self.pluginHandle, xbmcplugin.SORT_METHOD_PROGRAM_COUNT)
         xbmcplugin.addSortMethod(self.pluginHandle, xbmcplugin.SORT_METHOD_VIDEO_RUNTIME)
         xbmcplugin.addSortMethod(self.pluginHandle, xbmcplugin.SORT_METHOD_GENRE)
-        xbmcplugin.endOfDirectory(self.pluginHandle, success)
+        #xbmcplugin.endOfDirectory(self.pluginHandle, success)
+        xbmcplugin.endOfDirectory(self.pluginHandle, succeeded=success, updateListing=pUpdateListing, cacheToDisc=pCacheToDisc)
 
     def setView(self, content='movies'):
         # set the listing to a certain content, makes special views available
