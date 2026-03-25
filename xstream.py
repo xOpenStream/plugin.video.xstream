@@ -70,8 +70,7 @@ def parseUrl():
                 )
             except Exception:
                 import traceback
-                log(cConfig().getLocalizedString(30166) + ' -> [xstream]: Trailer error: %s'
-                    % traceback.format_exc(), LOGERROR)
+                logger.error(cConfig().getLocalizedString(30166) + ' -> [xstream]: Trailer error: %s' % traceback.format_exc())
                 cGui.showError('Trailer', 'Trailer-Suche fehlgeschlagen')
             return
         elif sFunction == 'searchAlter':
@@ -110,9 +109,9 @@ def parseUrl():
             if sLink:
                 xbmc.executebuiltin('PlayMedia(' + sLink + ')')
             else:
-                log(cConfig().getLocalizedString(30166) + ' -> [xstream]: Could not play remote url %s ' % sLink, LOGNOTICE)
+                logger.debug(cConfig().getLocalizedString(30166) + ' -> [xstream]: Could not play remote url %s ' % sLink)
         except resolver.resolver.ResolverError as e:
-            log(cConfig().getLocalizedString(30166) + ' -> [xstream]: ResolverError: %s' % e, LOGERROR)
+            logger.error(cConfig().getLocalizedString(30166) + ' -> [xstream]: ResolverError: %s' % e)
         return
     else:
         sFunction = 'load'
@@ -130,14 +129,14 @@ def parseUrl():
         isHoster = params.getValue('isHoster')
         url = params.getValue('url')
         manual = params.exist('manual')
-
-        if cConfig().getSetting('hosterSelect') == 'Auto' and playMode != 'jd' and playMode != 'jd2' and not manual:
+        hosterSelect = cConfig().getSetting('hosterSelect')
+        if hosterSelect == 'Auto' and playMode != 'jd' and playMode != 'jd2' and not manual:
             cHosterGui().streamAuto(playMode, sSiteName, sFunction)
         else:
             cHosterGui().stream(playMode, sSiteName, sFunction, url)
         return
 
-    log(cConfig().getLocalizedString(30166) + " -> [xstream]: Call function '%s' from '%s'" % (sFunction, sSiteName), LOGNOTICE)
+    logger.debug(cConfig().getLocalizedString(30166) + " -> [xstream]: Call function '%s' from '%s'" % (sFunction, sSiteName))
     # If the hoster gui is called, run the function on it and return
     if sSiteName == 'cHosterGui':
         showHosterGui(sFunction)
@@ -146,6 +145,7 @@ def parseUrl():
         searchterm = False
         if params.exist('searchterm'):
             searchterm = params.getValue('searchterm')
+            logger.debug('found searchTermin')
         searchGlobal(searchterm)
     elif sSiteName == 'xStream':
         oGui = cGui()
@@ -209,7 +209,7 @@ def showMainMenu(sFunction):
     oPluginHandler = cPluginHandler()
     aPlugins = oPluginHandler.getAvailablePlugins()
     if not aPlugins:
-        log(cConfig().getLocalizedString(30166) + ' -> [xstream]: No activated Plugins found', LOGNOTICE)
+        logger.debug(cConfig().getLocalizedString(30166) + ' -> [xstream]: No activated Plugins found')
         # Open the settings dialog to choose a plugin that could be enabled
         oGui.openSettings()
         oGui.updateDirectory()
@@ -237,7 +237,7 @@ def showMainMenu(sFunction):
     else:
         for folder in settingsGuiElements():
             oGui.addFolder(folder)
-    oGui.setEndOfDirectory()
+    oGui.setEndOfDirectory(pCacheToDisc=False) # caching will brake global search!
 
 
 def settingsGuiElements():
@@ -347,96 +347,94 @@ def _deserializeSearchResults(data):
 
 
 def searchGlobal(sSearchText=False):
-	oGui = cGui()
-	oGui.globalSearch = True
-	win = xbmcgui.Window(10000)
+    oGui = cGui()
+    oGui.globalSearch = True
+    win = xbmcgui.Window(10000)
+    if not sSearchText:
+        # Check if we have a cached search text (e.g. coming back from playback)
+        sSearchText = win.getProperty('xstream.globalSearchText')
+        if sSearchText:
+            # We have a cached search term — try to load cached results
+            cachedResults = win.getProperty('xstream.globalSearchResults')
+            if cachedResults:
+                try:
+                    results = _deserializeSearchResults(cachedResults)
+                    total = len(results)
+                    for result in sorted(results, key=lambda k: k['guiElement'].getSiteName()):
+                        oGui.addFolder(result['guiElement'], result['params'], bIsFolder=result['isFolder'], iTotal=total)
+                    oGui.setView()
+                    oGui.setEndOfDirectory()
+                    return True
+                except Exception:
+                    import traceback
+                    logger.error(cConfig().getLocalizedString(30166) + ' -> [xstream]: Search cache restore failed: %s' % traceback.format_exc())
+                    # Cache broken — fall through to fresh search
+                    win.clearProperty('xstream.globalSearchResults')
 
-	if not sSearchText:
-		# Check if we have a cached search text (e.g. coming back from playback)
-		sSearchText = win.getProperty('xstream.globalSearchText')
+        if not sSearchText:
+            sSearchText = oGui.showKeyBoard(sHeading=cConfig().getLocalizedString(30280))
+        if not sSearchText:
+            oGui.setEndOfDirectory()
+            return True
 
-		if sSearchText:
-			# We have a cached search term — try to load cached results
-			cachedResults = win.getProperty('xstream.globalSearchResults')
-			if cachedResults:
-				try:
-					results = _deserializeSearchResults(cachedResults)
-					total = len(results)
-					for result in sorted(results, key=lambda k: k['guiElement'].getSiteName()):
-						oGui.addFolder(result['guiElement'], result['params'], bIsFolder=result['isFolder'], iTotal=total)
-					oGui.setView()
-					oGui.setEndOfDirectory()
-					return True
-				except Exception:
-					import traceback
-					log(cConfig().getLocalizedString(30166) + ' -> [xstream]: Search cache restore failed: %s' % traceback.format_exc(), LOGERROR)
-					# Cache broken — fall through to fresh search
-					win.clearProperty('xstream.globalSearchResults')
+    # New search — clear old cached results
+    win.clearProperty('xstream.globalSearchResults')
+    win.setProperty('xstream.globalSearchText', sSearchText)
 
-		if not sSearchText:
-			sSearchText = oGui.showKeyBoard(sHeading=cConfig().getLocalizedString(30280))
-		if not sSearchText:
-			oGui.setEndOfDirectory()
-			return True
+    oGui._collectMode = True
 
-	# New search — clear old cached results
-	win.clearProperty('xstream.globalSearchResults')
-	win.setProperty('xstream.globalSearchText', sSearchText)
+    aPlugins = cPluginHandler().getAvailablePlugins()
+    dialog = xbmcgui.DialogProgress()
+    dialog.create(cConfig().getLocalizedString(30122), cConfig().getLocalizedString(30123))
 
-	oGui._collectMode = True
+    numPlugins = len(aPlugins)
+    searchablePlugins = [pluginEntry for pluginEntry in aPlugins if pluginEntry['globalsearch'] not in ['false', '']]
 
-	aPlugins = cPluginHandler().getAvailablePlugins()
-	dialog = xbmcgui.DialogProgress()
-	dialog.create(cConfig().getLocalizedString(30122), cConfig().getLocalizedString(30123))
+    def worker(pluginEntry):
+        logger.debug(cConfig().getLocalizedString(30166) + ' -> [xstream]: Searching for %s at %s' % (sSearchText, pluginEntry['id']))
+        _pluginSearch(pluginEntry, sSearchText, oGui)
+        return pluginEntry['name']
 
-	numPlugins = len(aPlugins)
-	searchablePlugins = [pluginEntry for pluginEntry in aPlugins if pluginEntry['globalsearch'] not in ['false', '']]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        future_to_plugin = {executor.submit(worker, pluginEntry): pluginEntry for pluginEntry in searchablePlugins}
 
-	def worker(pluginEntry):
-		log(cConfig().getLocalizedString(30166) + ' -> [xstream]: Searching for %s at %s' % (sSearchText, pluginEntry['id']),LOGNOTICE)
-		_pluginSearch(pluginEntry, sSearchText, oGui)
-		return pluginEntry['name']
+        for count, future in enumerate(concurrent.futures.as_completed(future_to_plugin)):
+            pluginEntry = future_to_plugin[future]
+            if dialog.iscanceled():
+                oGui.setEndOfDirectory()
+                return
+            try: pluginName = future.result()
+            except Exception as e:
+                pluginName = pluginEntry['name']
+                logger.error(f"Fehler bei Plugin {pluginName}: {str(e)}")
+            progress = (count + 1) * 50 // len(searchablePlugins)
+            dialog.update(progress, pluginName + cConfig().getLocalizedString(30125))
+    dialog.close()
 
-	with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-		future_to_plugin = {executor.submit(worker, pluginEntry): pluginEntry for pluginEntry in searchablePlugins}
+    # Cache the results for re-use when navigating back
+    try:
+        win.setProperty('xstream.globalSearchResults', _serializeSearchResults(oGui.searchResults))
+    except Exception:
+        import traceback
+        logger.error(cConfig().getLocalizedString(30166) + ' -> [xstream]: Search cache save failed: %s' % traceback.format_exc())
 
-		for count, future in enumerate(concurrent.futures.as_completed(future_to_plugin)):
-			pluginEntry = future_to_plugin[future]
-			if dialog.iscanceled():
-				oGui.setEndOfDirectory()
-				return
-			try: pluginName = future.result()
-			except Exception as e:
-				pluginName = pluginEntry['name']
-				log(f"Fehler bei Plugin {pluginName}: {str(e)}", LOGERROR)
-			progress = (count + 1) * 50 // len(searchablePlugins)
-			dialog.update(progress, pluginName + cConfig().getLocalizedString(30125))
-	dialog.close()
+    # Ergebnisse anzeigen
+    oGui._collectMode = False
+    total = len(oGui.searchResults)
+    dialog = xbmcgui.DialogProgress()
+    dialog.create(cConfig().getLocalizedString(30126), cConfig().getLocalizedString(30127))
 
-	# Cache the results for re-use when navigating back
-	try:
-		win.setProperty('xstream.globalSearchResults', _serializeSearchResults(oGui.searchResults))
-	except Exception:
-		import traceback
-		log(cConfig().getLocalizedString(30166) + ' -> [xstream]: Search cache save failed: %s' % traceback.format_exc(), LOGERROR)
+    for count, result in enumerate(sorted(oGui.searchResults, key=lambda k: k['guiElement'].getSiteName()), 1):
+        if dialog.iscanceled():
+            oGui.setEndOfDirectory()
+            return
+        oGui.addFolder(result['guiElement'], result['params'], bIsFolder=result['isFolder'], iTotal=total)
+        dialog.update(count * 100 // total, str(count) + cConfig().getLocalizedString(30128) + str(total) + ': ' + result['guiElement'].getTitle())
 
-	# Ergebnisse anzeigen
-	oGui._collectMode = False
-	total = len(oGui.searchResults)
-	dialog = xbmcgui.DialogProgress()
-	dialog.create(cConfig().getLocalizedString(30126), cConfig().getLocalizedString(30127))
-
-	for count, result in enumerate(sorted(oGui.searchResults, key=lambda k: k['guiElement'].getSiteName()), 1):
-		if dialog.iscanceled():
-			oGui.setEndOfDirectory()
-			return
-		oGui.addFolder(result['guiElement'], result['params'], bIsFolder=result['isFolder'], iTotal=total)
-		dialog.update(count * 100 // total, str(count) + cConfig().getLocalizedString(30128) + str(total) + ': ' + result['guiElement'].getTitle())
-
-	dialog.close()
-	oGui.setView()
-	oGui.setEndOfDirectory()
-	return True
+    dialog.close()
+    oGui.setView()
+    oGui.setEndOfDirectory()
+    return True
 
 def searchAlter(params):
     searchTitle = params.getValue('searchTitle')
@@ -471,7 +469,7 @@ def searchAlter(params):
     ]
 
     def worker(pluginEntry):
-        log(cConfig().getLocalizedString(30166) + ' -> [xstream]: Searching for ' + searchTitle + pluginEntry['id'], LOGNOTICE)
+        logger.debug(cConfig().getLocalizedString(30166) + ' -> [xstream]: Searching for ' + searchTitle + pluginEntry['id'])
         _pluginSearch(pluginEntry, searchTitle, oGui)
         return pluginEntry['name']
 
@@ -487,7 +485,7 @@ def searchAlter(params):
                 name = future.result()
             except Exception as e:
                 name = plugin['name']
-                log(f"Fehler bei Plugin {name}: {str(e)}", LOGERROR)
+                logger.error(f"Fehler bei Plugin {name}: {str(e)}")
             dialog.update((count + 1) * 50 // len(searchablePlugins) + 50, name + cConfig().getLocalizedString(30125))
 
     dialog.close()
@@ -496,7 +494,7 @@ def searchAlter(params):
     filteredResults = []
     for result in oGui.searchResults:
         guiElement = result['guiElement']
-        log(cConfig().getLocalizedString(30166) + ' -> [xstream]: Site: %s Titel: %s' % (guiElement.getSiteName(), guiElement.getTitle()), LOGNOTICE)
+        logger.debug(cConfig().getLocalizedString(30166) + ' -> [xstream]: Site: %s Titel: %s' % (guiElement.getSiteName(), guiElement.getTitle()))
         if searchTitle not in guiElement.getTitle():
             continue
         if guiElement._sYear and searchYear and guiElement._sYear != searchYear:
@@ -536,7 +534,7 @@ def searchTMDB(params):
     ]
 
     def worker(pluginEntry):
-        log(cConfig().getLocalizedString(30166) + ' -> [xstream]: Searching for %s at %s' % (sSearchText, pluginEntry['id']), LOGNOTICE)
+        logger.debug(cConfig().getLocalizedString(30166) + ' -> [xstream]: Searching for %s at %s' % (sSearchText, pluginEntry['id']))
         _pluginSearch(pluginEntry, sSearchText, oGui)
         return pluginEntry['name']
 
@@ -552,7 +550,7 @@ def searchTMDB(params):
                 name = future.result()
             except Exception as e:
                 name = plugin['name']
-                log(f"Fehler bei Plugin {name}: {str(e)}", LOGERROR)
+                logger.error(f"Fehler bei Plugin {name}: {str(e)}")
             dialog.update((count + 1) * 50 // len(searchablePlugins) + 50, name + cConfig().getLocalizedString(30125))
 
     dialog.close()
@@ -582,6 +580,6 @@ def _pluginSearch(pluginEntry, sSearchText, oGui):
         function = getattr(plugin, '_search')
         function(oGui, sSearchText)
     except Exception:
-        log(cConfig().getLocalizedString(30166) + ' -> [xstream]: ' + pluginEntry['name'] + ': search failed', LOGERROR)
+        logger.error(cConfig().getLocalizedString(30166) + ' -> [xstream]: ' + pluginEntry['name'] + ': search failed')
         import traceback
-        log(traceback.format_exc())
+        logger.error(traceback.format_exc())

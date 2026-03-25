@@ -33,7 +33,7 @@ jobs:
               exit(1)
           tree = ET.parse(path)
           root = tree.getroot()
-          today = date.today().isoformat()
+          today = date.today().isoformat().replace("-", ".")
           old = root.attrib.get('version', 'unbekannt')
           root.attrib['version'] = today
           tree.write(path, encoding="utf-8", xml_declaration=True)

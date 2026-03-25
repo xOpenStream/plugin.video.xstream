@@ -152,12 +152,14 @@ def showEntries(entryUrl=False, sGui=False, sSearchText=False, sSearchPageText =
         isMatchSiteSearch, sHtmlContainer = cParser.parseSingleResult(sHtmlContent, 'class="wp-pagenavi">(.*?)Next')
         if isMatchSiteSearch:
             isMatch, aResult = cParser.parse(sHtmlContainer, r'<span>([\d]+)</span>.*?nav_ext">.*?">([\d]+)</a>.*?href="([^"]+)')
-            for sPageActive, sPageLast, sNextPage in aResult:
-                #sPageName = '[I]Seitensuche starten  >>> [/I] Seite ' + str(sPageActive) + ' von ' + str(sPageLast) + ' Seiten  [I]<<<[/I]'
-                sPageName = cConfig().getLocalizedString(30284) + str(sPageActive) + cConfig().getLocalizedString(30285) + str(sPageLast) + cConfig().getLocalizedString(30286)
-                params.setParam('sNextPage', sNextPage)
-                params.setParam('sPageLast', sPageLast)
-                oGui.searchNextPage(sPageName, SITE_IDENTIFIER, 'showSearchPage', params)
+            if isMatch:
+                for sPageActive, sPageLast, sNextPage in aResult:
+                    #sPageName = '[I]Seitensuche starten  >>> [/I] Seite ' + str(sPageActive) + ' von ' + str(sPageLast) + ' Seiten  [I]<<<[/I]'
+                    sPageName = cConfig().getLocalizedString(30284) + str(sPageActive) + cConfig().getLocalizedString(30285) + str(sPageLast) + cConfig().getLocalizedString(30286)
+                    params.setParam('sNextPage', sNextPage)
+                    params.setParam('sPageLast', sPageLast)
+                    oGui.searchNextPage(sPageName, SITE_IDENTIFIER, 'showSearchPage', params)
+
         # End Page Function
 
         if isMatchNextPage:
