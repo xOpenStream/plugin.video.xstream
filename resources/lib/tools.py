@@ -227,44 +227,6 @@ class cParser:
         import base64
         return base64.b64decode(text).decode('utf-8')
 
-
-# xStream interner Log
-class logger:
-    @staticmethod
-    def info(sInfo):
-        logger.__writeLog(sInfo, cLogLevel=xbmc.LOGINFO)
-
-    @staticmethod
-    def debug(sInfo):
-        logger.__writeLog(sInfo, cLogLevel=xbmc.LOGDEBUG)
-
-    @staticmethod
-    def warning(sInfo):
-        logger.__writeLog(sInfo, cLogLevel=xbmc.LOGWARNING)
-
-    @staticmethod
-    def error(sInfo):
-        logger.__writeLog(sInfo, cLogLevel=xbmc.LOGERROR)
-
-    @staticmethod
-    def fatal(sInfo):
-        logger.__writeLog(sInfo, cLogLevel=xbmc.LOGFATAL)
-
-    @staticmethod
-    def __writeLog(sLog, cLogLevel=xbmc.LOGDEBUG):
-        params = ParameterHandler()
-        try:
-            if params.exist('site'):
-                site = params.getValue('site')
-                sLog = "[%s] -> [%s]: %s" % (cConfig().getAddonInfo('name'), site, sLog)
-            else:
-                sLog = "[%s] %s" % (cConfig().getAddonInfo('name'), sLog)
-            xbmc.log(sLog, cLogLevel)
-        except Exception as e:
-            xbmc.log('Logging Failure: %s' % e, cLogLevel)
-            pass
-
-
 class cUtil:
     @staticmethod
     def removeHtmlTags(sValue, sReplace=''):
@@ -388,32 +350,3 @@ def getRepofromAddonsDB(addonID):
     else:
         repo = ''
     return repo
-
-
-class cCache(object):
-    _win = None
-
-    def __init__(self):
-        # see https://kodi.wiki/view/Window_IDs
-        self._win = xbmcgui.Window(10000)
-
-    def __del__(self):
-        del self._win
-
-    def get(self, key, cache_time):
-        cachedata = self._win.getProperty(key)
-
-        if cachedata:
-            cachedata = ast.literal_eval(cachedata)
-            if time.time() - cachedata[0] < cache_time or cache_time < 0:
-                return cachedata[1]
-            else:
-                self._win.clearProperty(key)
-
-        return None
-    
-    def set(self, key, data):
-        self._win.setProperty(key, repr((time.time(), data)))
-
-    def clear(self):
-        self._win.clearProperties()

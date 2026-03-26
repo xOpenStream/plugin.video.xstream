@@ -4,7 +4,7 @@
 import xbmc
 from resources.lib.gui.gui import cGui
 from resources.lib.config import cConfig
-from xbmc import LOGINFO as LOGNOTICE, LOGERROR, log
+from resources.lib.logger import Logger as logger
 
 class XstreamPlayer(xbmc.Player):
     def __init__(self, *args, **kwargs):
@@ -13,24 +13,24 @@ class XstreamPlayer(xbmc.Player):
         self.streamSuccess = True
         self.playedTime = 0
         self.totalTime = 999999
-        log(cConfig().getLocalizedString(30166) + ' -> [player]: player instance created', LOGNOTICE)
+        logger.debug('-> [player]: player instance created')
 
     def onPlayBackStarted(self):
-        log(cConfig().getLocalizedString(30166) + ' -> [player]: starting Playback', LOGNOTICE)
+        logger.debug('-> [player]: starting Playback')
         try:
             self.totalTime = self.getTotalTime()
         except:
             self.totalTime = 999999
 
     def onPlayBackStopped(self):
-        log(cConfig().getLocalizedString(30166) + ' -> [player]: Playback stopped', LOGNOTICE)
+        logger.debug('-> [player]: Playback stopped')
         if self.playedTime == 0 and self.totalTime == 999999:
             self.streamSuccess = False
-            log(cConfig().getLocalizedString(30166) + ' -> [player]: Kodi failed to open stream', LOGERROR)
+            logger.debug('-> [player]: Kodi failed to open stream')
         self.streamFinished = True
 
     def onPlayBackEnded(self):
-        log(cConfig().getLocalizedString(30166) + ' -> [player]: Playback completed', LOGNOTICE)
+        logger.debug('-> [player]: Playback completed')
         if self.playedTime == 0 and self.totalTime == 999999:
             self.streamSuccess = False
         self.streamFinished = True
@@ -54,7 +54,7 @@ class cPlayer:
         oPlaylist.add(oGuiElement.getMediaUrl(), oListItem)
 
     def startPlayer(self):
-        log(cConfig().getLocalizedString(30166) + ' -> [player]: start player', LOGNOTICE)
+        logger.debug('-> [player]: start player')
         xbmcPlayer = XstreamPlayer()
         monitor = xbmc.Monitor()
         while (not monitor.abortRequested()) & (not xbmcPlayer.streamFinished):

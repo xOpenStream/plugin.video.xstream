@@ -15,7 +15,8 @@ import zlib
 import http.client
 
 from resources.lib.config import cConfig
-from resources.lib.tools import logger, cCache
+from resources.lib.cache import cCache
+from resources.lib.logger import Logger as logger
 from xbmcvfs import translatePath
 
 from urllib.parse import quote, urlencode, urlparse, quote_plus
@@ -97,7 +98,6 @@ class cRequestHandler:
         self._aParameters = {}
         self._headerEntries = {}
         self._profilePath = translatePath(cConfig().getAddonInfo('profile'))
-        self._cachePath = ''
         self._cookiePath = ''
         self._Status = ''
         self._sResponseHeader = ''
@@ -111,17 +111,14 @@ class cRequestHandler:
         self.ignoreErrors = ignoreErrors
         self.compression = compression
         self.jspost = jspost
-        self.cacheTime = int(cConfig().getSetting('cacheTime', 360)) *60 # 360 Minuten * 60 = 6 Stunden Cachetime
+        self.cacheTime = None
         self.requestTimeout = int(cConfig().getSetting('requestTimeout', 10))
         self.bypassDNSlock = (cConfig().getSetting('bypassDNSlock', 'false') == 'true')
         self.removeBreakLines(True)
         self.removeNewLines(True)
         self.__setDefaultHeader()
-        self.__setCachePath()
         self.__setCookiePath()
-        self.isMemoryCacheActive = (cConfig().getSetting('volatileHtmlCache', 'false') == 'true')
-        if self.isMemoryCacheActive:
-            self._memCache = cCache()
+        self.cache = cCache()
         
         socket.setdefaulttimeout(self.requestTimeout)
 
@@ -187,11 +184,8 @@ class cRequestHandler:
         return url
     
     def request(self):
-        if self.caching and self.cacheTime > 0  and self.method == 'GET' and self.data is None:
-            if self.isMemoryCacheActive:
-                sContent = self.__readVolatileCache(self.getRequestUri(), self.cacheTime)
-            else:
-                sContent = self.__readPersistentCache(self.getRequestUri())
+        if self.caching and self.method == 'GET' and self.data is None:
+            sContent = self.cache.get(self.getRequestUri())
             if sContent:
                 self._Status = '200'
                 return sContent
@@ -271,7 +265,7 @@ class cRequestHandler:
                     opener.addheaders = [('User-agent', self._USER_AGENT), ('Referer', self._sUrl)]
                     oResponse = opener.open(self._sUrl, sParameters if len(sParameters) > 0 else None)
                     if not oResponse:
-                        logger.error(' -> [requestHandler]: Failed DDOS-GUARD active: ' + self._sUrl)
+                        logger.error('-> [requestHandler]: Failed DDOS-GUARD active: ' + self._sUrl)
                         return 'DDOS GUARD SCHUTZ'
                 elif 'cloudflare' in str(e.headers):
                     if not self.ignoreErrors:
@@ -280,27 +274,27 @@ class cRequestHandler:
                         msg += '\nDer  Zugriff ist deshalb blockiert.'
                         msg += '\n\nBitte versuchen Sie es später erneut oder prüfen Sie die Webseite im Browser.'
                         xbmcgui.Dialog().ok('Cloudflare Schutz aktiv', msg)
-                    logger.error(' -> [requestHandler]: Failed Cloudflare active: ' + self._sUrl)
+                    logger.error('-> [requestHandler]: Failed Cloudflare active: ' + self._sUrl)
                     return 'CLOUDFLARE-SCHUTZ AKTIV' # Meldung geht als "e.doc" in die exception nach default.py
                 else:
                     if not self.ignoreErrors:
                         xbmcgui.Dialog().ok('xStream', cConfig().getLocalizedString(30259) + ' {0} {1}'.format(self._sUrl, str(e)))
-                    logger.error(' -> [requestHandler]: HTTPError ' + str(e) + ' Url: ' + self._sUrl)
+                    logger.error('-> [requestHandler]: HTTPError ' + str(e) + ' Url: ' + self._sUrl)
                     return 'SEITE NICHT ERREICHBAR'
             else:
                 if not self.ignoreErrors:
                     xbmcgui.Dialog().ok('xStream', cConfig().getLocalizedString(30259) + ' {0} {1}'.format(self._sUrl, str(e)))
-                logger.error(' -> [requestHandler]: HTTPError ' + str(e) + ' Url: ' + self._sUrl)
+                logger.error('-> [requestHandler]: HTTPError ' + str(e) + ' Url: ' + self._sUrl)
                 return 'SEITE NICHT ERREICHBAR'
         except URLError as e:
             if not self.ignoreErrors:
                 xbmcgui.Dialog().ok('xStream', str(e.reason))
-            logger.error(' -> [requestHandler]: URLError ' + str(e.reason) + ' Url: ' + self._sUrl)
+            logger.error('-> [requestHandler]: URLError ' + str(e.reason) + ' Url: ' + self._sUrl)
             return 'URL FEHLER'
         except HTTPException as e:
             if not self.ignoreErrors:
                 xbmcgui.Dialog().ok('xStream', str(e))
-            logger.error(' -> [requestHandler]: HTTPException ' + str(e) + ' Url: ' + self._sUrl)
+            logger.error('-> [requestHandler]: HTTPException ' + str(e) + ' Url: ' + self._sUrl)
             return 'TIMEOUT'
 
         self._sResponseHeader = oResponse.info()
@@ -323,12 +317,12 @@ class cRequestHandler:
             if bf:
                 sContent = bf
             else:
-                logger.error(' -> [requestHandler]: Failed Blazingfast active: ' + self._sUrl)
+                logger.error('-> [requestHandler]: Failed Blazingfast active: ' + self._sUrl)
 
         try:
             cookieJar.save(ignore_discard=self.__bIgnoreDiscard, ignore_expires=self.__bIgnoreExpired)
         except Exception as e:
-            logger.error(' -> [requestHandler]: Failed save cookie: %s' % e)
+            logger.error('-> [requestHandler]: Failed save cookie: %s' % e)
 
         self._sRealUrl = oResponse.geturl()
         self._Status = oResponse.getcode() if self._sUrl == self._sRealUrl else '301'
@@ -338,11 +332,8 @@ class cRequestHandler:
         if self.__bRemoveBreakLines:
             sContent = sContent.replace('&nbsp;', '')
 
-        if self.caching and self.cacheTime > 0 and self.method == 'GET' and self.data is None:
-            if self.isMemoryCacheActive:
-                self.__writeVolatileCache(self.getRequestUri(), sContent)
-            else:
-                self.__writePersistentCache(self.getRequestUri(), sContent)
+        if self.caching and self.method == 'GET' and self.data is None:
+            self.cache.set(self.getRequestUri(), sContent)
 
         return sContent
 
@@ -391,8 +382,8 @@ class cRequestHandler:
         hostname = parsed_url.hostname
         key = 'doh_request' + hostname
 
-        if self.isMemoryCacheActive and self.cacheTime > 0:
-            ip_address = self.__readVolatileCache(key, self.cacheTime)
+        if self.cache:
+            ip_address = self.cache.get(key)
             if ip_address:
                 return ip_address
         
@@ -408,71 +399,13 @@ class cRequestHandler:
             if "Answer" not in dns_response:
                 raise Exception("Invalid DNS response")
             ip_address = dns_response["Answer"][0]["data"]
-            if self.isMemoryCacheActive and self.cacheTime > 0:
-                self.__writeVolatileCache(key, ip_address)
+            if self.cache:
+                self.cache.set(key, ip_address)
 
             return ip_address
         except Exception as e:
-            logger.error(' -> [requestHandler]: DNS query failed: %s' % e)
+            logger.error('-> [requestHandler]: DNS query failed: %s' % e)
             return None
-
-    def __setCachePath(self):
-        cache = os.path.join(self._profilePath, 'htmlcache')
-        if not os.path.exists(cache):
-            os.makedirs(cache)
-        self._cachePath = cache
-
-    def __readPersistentCache(self, url):
-        h = hashlib.md5(url.encode('utf8')).hexdigest()
-        cacheFile = os.path.join(self._cachePath, h)
-        fileAge = self.getFileAge(cacheFile)
-        if 0 < fileAge < self.cacheTime:
-            try:
-                with open(cacheFile, 'rb') as f:
-                        content = f.read().decode('utf8')
-            except Exception:
-                logger.error(' -> [requestHandler]: Could not read Cache')
-            if content:
-                logger.info(' -> [requestHandler]: read html for %s from cache' % url)
-                return content
-        return None
-
-    def __writePersistentCache(self, url, content):
-        try:
-            h = hashlib.md5(url.encode('utf8')).hexdigest()
-            with open(os.path.join(self._cachePath, h), 'wb') as f:
-                f.write(content.encode('utf8'))
-        except Exception:
-            logger.error(' -> [requestHandler]: Could not write Cache')
-
-    def __writeVolatileCache(self, url, content):
-        self._memCache.set(hashlib.md5(url.encode('utf8')).hexdigest(), content)
-
-    def __readVolatileCache(self, url, cache_time):
-        entry = self._memCache.get(hashlib.md5(url.encode('utf8')).hexdigest(), cache_time)
-        if entry:
-            logger.info('-> [requestHandler]: read html for %s from cache' % url)
-        return entry
-
-    @staticmethod
-    def getFileAge(cacheFile):
-        try:
-            return time.time() - os.stat(cacheFile).st_mtime
-        except Exception:
-            return 0
-
-    def clearCache(self):
-        # clear volatile cache
-        if self.isMemoryCacheActive:
-            self._memCache.clear()
-        cRequestHandler.persistent_openers.clear()
-        
-        # clear persistent cache
-        files = os.listdir(self._cachePath)
-        for file in files:
-            os.remove(os.path.join(self._cachePath, file))
-            xbmcgui.Dialog().notification('xStream', cConfig().getLocalizedString(30405), xbmcgui.NOTIFICATION_INFO, 100, False)
-
 
 class cBF:
     def resolve(self, url, html, cookie_jar, user_agent, sParameters):

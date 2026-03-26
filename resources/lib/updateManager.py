@@ -10,9 +10,9 @@ import zipfile
 from requests.auth import HTTPBasicAuth
 from resources.lib.config import cConfig
 from resources.lib.tools import infoDialog
-from xbmc import LOGINFO as LOGNOTICE, LOGERROR, LOGWARNING, log, executebuiltin
+from xbmc import executebuiltin
 from xbmcvfs import translatePath
-
+from resources.lib.logger import Logger as logger
 
 # Resolver
 def resolverUpdate():
@@ -26,7 +26,7 @@ def resolverUpdate():
     try:
         return UpdateResolve(username, resolve_dir, resolve_id, branch, token)
     except Exception as e:
-        log(' -> [updateManager]: Exception Raised: %s' % str(e), LOGERROR)
+        logger.error('-> [updateManager]: Exception Raised: %s' % str(e))
         return False
 
 
@@ -39,7 +39,7 @@ def UpdateResolve(username, resolve_dir, resolve_id, branch, token):
     INSTALL_PATH = translatePath(os.path.join('special://home/addons/', '%s') % resolve_id) # Installation Ordner
     
     auth = HTTPBasicAuth(username, token)
-    log(cConfig().getLocalizedString(30166) + ' -> [updateManager]: %s: - Search for updates.' % resolve_id, LOGNOTICE)
+    logger.debug('-> [updateManager]: %s: - Search for updates.' % resolve_id)
     try:
         ADDON_DIR = translatePath(os.path.join('special://userdata/addon_data/', '%s') % resolve_id) # Pfad von ResolveURL Daten
         LOCAL_PLUGIN_VERSION = os.path.join(ADDON_DIR, "update_sha")    # Pfad der update.sha in den ResolveURL Daten
@@ -54,28 +54,28 @@ def UpdateResolve(username, resolve_dir, resolve_id, branch, token):
             isTrue = commitUpdate(commitXML, LOCAL_PLUGIN_VERSION, REMOTE_PLUGIN_DOWNLOADS, PACKAGES_PATH, resolve_dir, LOCAL_FILE_NAME_PLUGIN, auth)
             
             if isTrue is True:
-                log(cConfig().getLocalizedString(30166) + ' -> [updateManager]: %s: - download new update.' % resolve_id, LOGNOTICE)
+                logger.debug('-> [updateManager]: %s: - download new update.' % resolve_id)
                 shutil.make_archive(ADDON_PATH, 'zip', ADDON_PATH)
                 shutil.unpack_archive(ADDON_PATH + '.zip', INSTALL_PATH)
-                log(cConfig().getLocalizedString(30166) + ' -> [updateManager]: %s: - install new update.' % resolve_id, LOGNOTICE)
+                logger.debug('-> [updateManager]: %s: - install new update.' % resolve_id)
                 if os.path.exists(ADDON_PATH + '.zip'): os.remove(ADDON_PATH + '.zip')
-                log(cConfig().getLocalizedString(30166) + ' -> [updateManager]: %s: - update completed.' % resolve_id, LOGNOTICE)
+                logger.debug('-> [updateManager]: %s: - update completed.' % resolve_id)
                 return True
             elif isTrue is None:
-                log(cConfig().getLocalizedString(30166) + ' -> [updateManager]: %s: - no update available.' % resolve_id, LOGNOTICE)
+                logger.debug('-> [updateManager]: %s: - no update available.' % resolve_id)
                 return None
 
-        log(cConfig().getLocalizedString(30166) + ' -> [updateManager]: %s: - Error updating!' % resolve_id, LOGERROR)
+        logger.error('-> [updateManager]: %s: - Error updating!' % resolve_id)
         return False
     except:
-        log(cConfig().getLocalizedString(30166) + ' -> [updateManager]: %s: - Error updating!' % resolve_id, LOGERROR)
+        logger.error('-> [updateManager]: %s: - Error updating!' % resolve_id)
         return False
 
 def commitUpdate(onlineFile, offlineFile, downloadLink, LocalDir, plugin_id, localFileName, auth):
     try:
         jsData = json.loads(onlineFile)
         if not os.path.exists(offlineFile) or open(offlineFile).read() != jsData['sha']:
-            log(cConfig().getLocalizedString(30166) + ' -> [updateManager]: %s: - Start updating!' % plugin_id, LOGNOTICE)
+            logger.debug('-> [updateManager]: %s: - Start updating!' % plugin_id)
             isTrue = doUpdate(LocalDir, downloadLink, plugin_id, localFileName, auth)
             if isTrue is True:
                 try:
@@ -89,7 +89,7 @@ def commitUpdate(onlineFile, offlineFile, downloadLink, LocalDir, plugin_id, loc
             return None
     except Exception:
         os.remove(offlineFile)
-        log(' -> [updateManager]: RateLimit reached')
+        logger.error('-> [updateManager]: RateLimit reached')
         return False
 
 
@@ -121,7 +121,7 @@ def doUpdate(LocalDir, REMOTE_PATH, Title, localFileName, auth):
         executebuiltin("UpdateLocalAddons()")
         return True
     except:
-        log(cConfig().getLocalizedString(30166) + ' -> [updateManager]: doUpdate not possible due download error')
+        logger.error('-> [updateManager]: doUpdate not possible due download error')
         return False
 
 
@@ -146,9 +146,9 @@ def _getXmlString(xml_url, auth):
         if "sha" in json.loads(xmlString):
             return xmlString
         else:
-            log(cConfig().getLocalizedString(30166) + ' -> [updateManager]: Update-URL incorrect or bad credentials')
+            logger.error('-> [updateManager]: Update-URL incorrect or bad credentials')
     except Exception as e:
-        log(e)
+        logger.error(e)
 
 
 # todo Verzeichnis packen -für zukünftige Erweiterung "Backup"
@@ -171,4 +171,4 @@ def devUpdates():  # für manuelles Updates vorgesehen
         if status == None:  infoDialog(cConfig().getLocalizedString(30118), sound=False, icon='INFO', time=6000)
         if cConfig().getSetting('enforceUpdate') == 'true': cConfig().setSetting('enforceUpdate', 'false')
     except Exception as e:
-        log(e)
+        logger.error(e)

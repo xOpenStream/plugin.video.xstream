@@ -9,7 +9,7 @@ import requests
 from resources.lib import utils
 from resources.lib.config import cConfig
 from resources.lib.gui.gui import cGui
-from xbmc import LOGINFO as LOGNOTICE, LOGERROR, log
+from resources.lib.logger import Logger as logger
 from xbmcvfs import translatePath
 
 # Default User-Agent to avoid CDN blocks
@@ -38,7 +38,7 @@ class cDownload:
             header = dict([item.split('=') for item in (url.split('|')[1]).split('&')])
         except Exception:
             header = {}
-        log(cConfig().getLocalizedString(30166) + ' -> [download]: Header for download: %s' % header, LOGNOTICE)
+        logger.debug('-> [download]: Header for download: %s' % header)
         url = url.split('|')[0]
         sTitle = self.__createTitle(url, sTitle)
         self.__sTitle = self.__createDownloadFilename(sTitle)
@@ -57,19 +57,19 @@ class cDownload:
             if not os.path.isdir(temp_dir):
                 os.makedirs(os.path.join(temp_dir))
             self.__prepareDownload(url, header, os.path.join(temp_dir, sTitle), downloadDialogTitle)
-            log(cConfig().getLocalizedString(30166) + ' -> [download]: download completed', LOGNOTICE)
+            logger.debug('-> [download]: download completed')
 
 
     def __prepareDownload(self, url, header, sDownloadPath, downloadDialogTitle):
         try:
-            log(cConfig().getLocalizedString(30166) + ' -> [download]: download file: ' + str(url) + ' to ' + str(sDownloadPath), LOGNOTICE)
+            logger.debug('-> [download]: download file: ' + str(url) + ' to ' + str(sDownloadPath))
             self.__createProcessDialog(downloadDialogTitle)
             # Set User-Agent if not provided
             if 'User-Agent' not in header and 'user-agent' not in header:
                 header['User-Agent'] = _UA
             self.__download(url, header, sDownloadPath)
         except Exception as e:
-            log(cConfig().getLocalizedString(30166) + ' -> [download]: download error: %s' % str(e), LOGERROR)
+            logger.error('-> [download]: download error: %s' % str(e))
             try:
                 cGui().showError('xStream', 'Download fehlgeschlagen: %s' % str(e), 5)
             except:
@@ -90,8 +90,8 @@ class cDownload:
             iTotalSize = -1
         chunk_size = 1024 * 1024  # 1MB chunks for reliable fast downloads
 
-        log(cConfig().getLocalizedString(30166) + ' -> [download]: start download (size: %s)' %
-            (self.__formatFileSize(iTotalSize) if iTotalSize > 0 else 'unbekannt'), LOGNOTICE)
+        logger.debug('-> [download]: start download (size: %s)' %
+            (self.__formatFileSize(iTotalSize) if iTotalSize > 0 else 'unbekannt'))
 
         f = None
         iBytesLoaded = 0
@@ -101,7 +101,7 @@ class cDownload:
 
             for data in response.iter_content(chunk_size=chunk_size):
                 if self.__processIsCanceled:
-                    log(cConfig().getLocalizedString(30166) + ' -> [download]: download cancelled by user', LOGNOTICE)
+                    logger.debug('-> [download]: download cancelled by user')
                     break
                 if not data:
                     continue
@@ -113,25 +113,28 @@ class cDownload:
             f = None
 
             if not self.__processIsCanceled:
-                log(cConfig().getLocalizedString(30166) + ' -> [download]: download complete (%s)' %
-                    self.__formatFileSize(iBytesLoaded), LOGNOTICE)
+                logger.debug('-> [download]: download complete (%s)' %
+                    self.__formatFileSize(iBytesLoaded))
 
         except Exception as e:
-            log(cConfig().getLocalizedString(30166) + ' -> [download]: download failed at %s: %s' %
-                (self.__formatFileSize(iBytesLoaded), str(e)), LOGERROR)
+            logger.error('-> [download]: download failed at %s: %s' %
+                (self.__formatFileSize(iBytesLoaded), str(e)))
             if f:
                 f.close()
             raise
 
 
     def __createTitle(self, sUrl, sTitle):
-        aTitle = sTitle.rsplit('.')
-        if len(aTitle) > 1:
+        if '.' in sTitle:
             return sTitle
-        aUrl = sUrl.rsplit('.')
-        if len(aUrl) > 1:
-            sSuffix = aUrl[-1]
-            sTitle = sTitle + '.' + sSuffix
+
+        video_exts = ('mp4', 'mkv', 'avi', 'mov', 'flv', 'wmv', 'webm', 'mpeg', 'mpg')
+        sUrl_clean = sUrl.split('?', 1)[0]
+        parts = sUrl_clean.rsplit('.', 1)
+        if len(parts) > 1:
+            ext = parts[-1].lower()
+            if ext in video_exts:
+                return f"{sTitle}.{ext}"
         return sTitle
 
 

@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 # Python 3
 
-from xbmc import LOGINFO as LOGNOTICE, log
 from resources.lib.config import cConfig
+from resources.lib.logger import Logger as logger
 from resources.lib.gui.gui import cGui
 from resources.lib.handler.requestHandler import cRequestHandler
 
@@ -21,7 +21,7 @@ class cJDownloaderHandler:
             cGui().showInfo(cConfig().getLocalizedString(30070), cConfig().getLocalizedString(30256), 5)
 
     def __checkConfig(self):
-        log(cConfig().getLocalizedString(30166) + ' -> [jdownloaderHandler]: check JD Addon settings', LOGNOTICE)
+        logger.debug('-> [jdownloaderHandler]: check JD Addon settings')
         
         bEnabled = cConfig().getSetting('jd_enabled')
         if bEnabled == 'true':
@@ -52,7 +52,7 @@ class cJDownloaderHandler:
         bAutomaticDownload = self.__getAutomaticStart()
         bLinkGrabber = self.__getLinkGrabber()
         sLinkForJd = self.__createJDUrl(sFileUrl, sHost, sPort, bAutomaticDownload, bLinkGrabber)
-        log(cConfig().getLocalizedString(30166) + ' -> [jdownloaderHandler]: JD Link: ' + str(sLinkForJd), LOGNOTICE)
+        logger.debug('-> [jdownloaderHandler]: JD Link: ' + str(sLinkForJd))
         oRequestHandler = cRequestHandler(sLinkForJd)
         oRequestHandler.request()
         return True
@@ -69,7 +69,7 @@ class cJDownloaderHandler:
         return sUrl
 
     def __checkConnection(self):
-        log(cConfig().getLocalizedString(30166) + ' -> [jdownloaderHandler]: check JD Connection', LOGNOTICE)
+        logger.debug('-> [jdownloaderHandler]: check JD Connection')
         sHost = self.__getHost()
         sPort = self.__getPort()
         sLinkForJd = 'http://' + str(sHost) + ':' + str(sPort)

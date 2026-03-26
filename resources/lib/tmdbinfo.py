@@ -8,7 +8,7 @@ import xbmcgui
 
 from resources.lib.config import cConfig
 from resources.lib.tmdb import cTMDB
-from resources.lib.tools import logger
+from resources.lib.logger import Logger as logger
 from datetime import date, datetime
 from urllib.parse import urlencode
 

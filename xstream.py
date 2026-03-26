@@ -11,11 +11,12 @@ import concurrent.futures
 from resources.lib.handler.ParameterHandler import ParameterHandler
 from resources.lib.handler.requestHandler import cRequestHandler
 from resources.lib.handler.pluginHandler import cPluginHandler
-from xbmc import LOGINFO as LOGNOTICE, LOGERROR, log
 from resources.lib.gui.guiElement import cGuiElement
 from resources.lib.gui.gui import cGui
 from resources.lib.config import cConfig
-from resources.lib.tools import logger, cParser, cCache
+from resources.lib.tools import cParser
+from resources.lib.cache import cCache
+from resources.lib.logger import Logger as logger
 from xbmcvfs import translatePath
 
 try:
@@ -41,13 +42,14 @@ def parseUrl():
     params = ParameterHandler()
     logger.info(params.getAllParameters())
 
+    logger.debug('special Funtions')
     # If no function is set, we set it to the default "load" function
     if params.exist('function'):
         sFunction = params.getValue('function')
         if sFunction == 'spacer':
             return True
         elif sFunction == 'clearCache':
-            cRequestHandler('dummy').clearCache()
+            cCache().clearCache()
             return
         elif sFunction == 'viewInfo':
             viewInfo(params)
@@ -70,7 +72,7 @@ def parseUrl():
                 )
             except Exception:
                 import traceback
-                logger.error(cConfig().getLocalizedString(30166) + ' -> [xstream]: Trailer error: %s' % traceback.format_exc())
+                logger.error('Trailer error: %s' % traceback.format_exc())
                 cGui.showError('Trailer', 'Trailer-Suche fehlgeschlagen')
             return
         elif sFunction == 'searchAlter':
@@ -109,13 +111,14 @@ def parseUrl():
             if sLink:
                 xbmc.executebuiltin('PlayMedia(' + sLink + ')')
             else:
-                logger.debug(cConfig().getLocalizedString(30166) + ' -> [xstream]: Could not play remote url %s ' % sLink)
+                logger.debug('Could not play remote url %s ' % sLink)
         except resolver.resolver.ResolverError as e:
-            logger.error(cConfig().getLocalizedString(30166) + ' -> [xstream]: ResolverError: %s' % e)
+            logger.error('ResolverError: %s' % e)
         return
     else:
         sFunction = 'load'
 
+    logger.debug('special site')
     # Test if we should run a function on a special site
     if not params.exist('site'):
         # As a default if no site was specified, we run the default starting gui with all plugins
@@ -136,7 +139,7 @@ def parseUrl():
             cHosterGui().stream(playMode, sSiteName, sFunction, url)
         return
 
-    logger.debug(cConfig().getLocalizedString(30166) + " -> [xstream]: Call function '%s' from '%s'" % (sFunction, sSiteName))
+    logger.debug("Call function '%s' from '%s'" % (sFunction, sSiteName))
     # If the hoster gui is called, run the function on it and return
     if sSiteName == 'cHosterGui':
         showHosterGui(sFunction)
@@ -187,16 +190,22 @@ def parseUrl():
         function = getattr(plugin, sFunction)
         function()
 
+    logger.debug('done')
 
 def showMainMenu(sFunction):
+    logger.debug(f'showMainMenu {sFunction}')
     ART = os.path.join(cConfig().getAddonInfo('path'), 'resources', 'art')
     addon_id = cConfig().getAddonInfo('id')
     start_time = time.time()
     # timeout for the startup status check  to make sure all is done
-    while (startupStatus := cCache().get(addon_id + '_main', -1)) != 'finished' and time.time() - start_time <= 25:
+    startupFlag = cConfig().getSetting(cConfig().getAddonInfo('id') + '_main')
+    logger.debug(f'cache get init {startupFlag}')
+    
+    while (startupStatus := cConfig().getSetting(cConfig().getAddonInfo('id') + '_main')) != 'finished' and time.time() - start_time <= 25:
         time.sleep(0.2)
     
     # Clear cached search texts so next search opens fresh keyboard
+    logger.debug(f'showMainMenu clear search text')
     xbmcgui.Window(10000).clearProperty('xstream.globalSearchText')
     xbmcgui.Window(10000).clearProperty('xstream.globalSearchResults')
 
@@ -209,12 +218,13 @@ def showMainMenu(sFunction):
     oPluginHandler = cPluginHandler()
     aPlugins = oPluginHandler.getAvailablePlugins()
     if not aPlugins:
-        logger.debug(cConfig().getLocalizedString(30166) + ' -> [xstream]: No activated Plugins found')
+        logger.debug('No activated Plugins found')
         # Open the settings dialog to choose a plugin that could be enabled
         oGui.openSettings()
         oGui.updateDirectory()
     else:
         # Create a gui element for every plugin found
+        logger.debug(f'showMainMenu Create a gui')
         for aPlugin in sorted(aPlugins, key=lambda k: k['id']):
             oGuiElement = cGuiElement()
             oGuiElement.setTitle(aPlugin['name'])
@@ -237,6 +247,7 @@ def showMainMenu(sFunction):
     else:
         for folder in settingsGuiElements():
             oGui.addFolder(folder)
+    logger.debug(f'showMainMenu setEndOfDirectory')
     oGui.setEndOfDirectory(pCacheToDisc=False) # caching will brake global search!
 
 
@@ -367,7 +378,7 @@ def searchGlobal(sSearchText=False):
                     return True
                 except Exception:
                     import traceback
-                    logger.error(cConfig().getLocalizedString(30166) + ' -> [xstream]: Search cache restore failed: %s' % traceback.format_exc())
+                    logger.error('Search cache restore failed: %s' % traceback.format_exc())
                     # Cache broken — fall through to fresh search
                     win.clearProperty('xstream.globalSearchResults')
 
@@ -391,7 +402,7 @@ def searchGlobal(sSearchText=False):
     searchablePlugins = [pluginEntry for pluginEntry in aPlugins if pluginEntry['globalsearch'] not in ['false', '']]
 
     def worker(pluginEntry):
-        logger.debug(cConfig().getLocalizedString(30166) + ' -> [xstream]: Searching for %s at %s' % (sSearchText, pluginEntry['id']))
+        logger.debug('Searching for %s at %s' % (sSearchText, pluginEntry['id']))
         _pluginSearch(pluginEntry, sSearchText, oGui)
         return pluginEntry['name']
 
@@ -416,7 +427,7 @@ def searchGlobal(sSearchText=False):
         win.setProperty('xstream.globalSearchResults', _serializeSearchResults(oGui.searchResults))
     except Exception:
         import traceback
-        logger.error(cConfig().getLocalizedString(30166) + ' -> [xstream]: Search cache save failed: %s' % traceback.format_exc())
+        logger.error('Search cache save failed: %s' % traceback.format_exc())
 
     # Ergebnisse anzeigen
     oGui._collectMode = False
@@ -469,7 +480,7 @@ def searchAlter(params):
     ]
 
     def worker(pluginEntry):
-        logger.debug(cConfig().getLocalizedString(30166) + ' -> [xstream]: Searching for ' + searchTitle + pluginEntry['id'])
+        logger.debug('Searching for ' + searchTitle + pluginEntry['id'])
         _pluginSearch(pluginEntry, searchTitle, oGui)
         return pluginEntry['name']
 
@@ -494,7 +505,7 @@ def searchAlter(params):
     filteredResults = []
     for result in oGui.searchResults:
         guiElement = result['guiElement']
-        logger.debug(cConfig().getLocalizedString(30166) + ' -> [xstream]: Site: %s Titel: %s' % (guiElement.getSiteName(), guiElement.getTitle()))
+        logger.debug('Site: %s Titel: %s' % (guiElement.getSiteName(), guiElement.getTitle()))
         if searchTitle not in guiElement.getTitle():
             continue
         if guiElement._sYear and searchYear and guiElement._sYear != searchYear:
@@ -534,7 +545,7 @@ def searchTMDB(params):
     ]
 
     def worker(pluginEntry):
-        logger.debug(cConfig().getLocalizedString(30166) + ' -> [xstream]: Searching for %s at %s' % (sSearchText, pluginEntry['id']))
+        logger.debug('Searching for %s at %s' % (sSearchText, pluginEntry['id']))
         _pluginSearch(pluginEntry, sSearchText, oGui)
         return pluginEntry['name']
 
@@ -580,6 +591,6 @@ def _pluginSearch(pluginEntry, sSearchText, oGui):
         function = getattr(plugin, '_search')
         function(oGui, sSearchText)
     except Exception:
-        logger.error(cConfig().getLocalizedString(30166) + ' -> [xstream]: ' + pluginEntry['name'] + ': search failed')
+        logger.error(pluginEntry['name'] + ': search failed')
         import traceback
         logger.error(traceback.format_exc())

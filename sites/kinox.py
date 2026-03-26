@@ -5,12 +5,12 @@
 
 from resources.lib.handler.ParameterHandler import ParameterHandler
 from resources.lib.handler.requestHandler import cRequestHandler
-from resources.lib.tools import logger, cParser
+from resources.lib.tools import cParser
+from resources.lib.logger import Logger as logger
 from resources.lib.gui.guiElement import cGuiElement
 from resources.lib.gui.gui import cGui
 from resources.lib.config import cConfig
 from json import loads
-#from xbmc import LOGINFO as LOGNOTICE, LOGERROR, log
 
 SITE_IDENTIFIER = 'kinox'
 SITE_NAME = 'KinoX'
@@ -455,7 +455,6 @@ def ajaxCall():
     logger.info('MediaType: ' + sMediaType + ' , Page: ' + str(iPage) + ' , iMediaTypePageId: ' + str(
         iMediaTypePageId) + ' , sCharacter: ' + str(sCharacter))
     sHtmlContent = __getAjaxContent(sMediaType, iPage, iMediaTypePageId, metaOn, sCharacter)
-    #log('DEBUG: %s ' % sHtmlContent, LOGNOTICE)
     if not sHtmlContent:
         return
     if metaOn and not sMediaType == 'documentation':
@@ -570,7 +569,6 @@ def __getAjaxContent(sMediaType, iPage, iMediaTypePageId, metaOn, sCharacter='')
         sUrl = oRequest.getRequestUri()
         oRequest = cRequestHandler(sUrl)
     oRequest.addHeaderEntry('Cookie', sPrefLang + 'ListDisplayYears=Always;')
-    #log('DEBUG: %s ' % oRequest.getRequestUri(), LOGNOTICE)
     return oRequest.request()
 
 

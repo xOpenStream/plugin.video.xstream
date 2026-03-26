@@ -3,7 +3,7 @@
 
 from resources.lib.tools import cParser, cUtil
 from resources.lib.config import cConfig
-from xbmc import LOGERROR, log
+from resources.lib.logger import Logger as logger
 from os import path
 
 class cGuiElement:
@@ -118,7 +118,7 @@ class cGuiElement:
         if mediaType in self.MEDIA_TYPES:
             self._mediaType = mediaType
         else:
-            log(cConfig().getLocalizedString(30166) + ' -> [guiElement]: Unknown MediaType given for %s' % self.getTitle(), LOGERROR)
+            logger.error('-> [guiElement]: Unknown MediaType given for %s' % self.getTitle())
 
     def setSeason(self, season):
         self._season = season
@@ -135,17 +135,17 @@ class cGuiElement:
         try:
             year = int(year)
         except:
-            log(cConfig().getLocalizedString(30166) + ' -> [guiElement]: Year given for %s seems not to be a valid number' % self.getTitle(), LOGERROR)
+            logger.error('-> [guiElement]: Year given for %s seems not to be a valid number' % self.getTitle())
             return False
         if len(str(year)) != 4:
-            log(cConfig().getLocalizedString(30166) + ' -> [guiElement]: Year given for %s has %s digits, required 4 digits' % (self.getTitle(), len(str(year))), LOGERROR)
+            logger.error('-> [guiElement]: Year given for %s has %s digits, required 4 digits' % (self.getTitle(), len(str(year))))
             return False
         if year > 0:
             self._sYear = str(year)
             self.__aItemValues['year'] = year
             return True
         else:
-            log(cConfig().getLocalizedString(30166) + ' -> [guiElement]: Year given for %s must be greater than 0' % self.getTitle(), LOGERROR)
+            logger.error('-> [guiElement]: Year given for %s must be greater than 0' % self.getTitle())
             return False
 
     def setQuality(self, quality):
@@ -343,13 +343,13 @@ class cGuiElement:
         if not self._mediaType:
             self.setMediaType(mediaType)
         if mode not in ['add', 'replace']:
-            log(cConfig().getLocalizedString(30166) + ' -> [guiElement]: Wrong meta set mode', LOGERROR)
+            logger.error('-> [guiElement]: Wrong meta set mode')
         if not season and self._season:
             season = self._season
         if not episode and self._episode:
             episode = self._episode
         if not self._mediaType:
-            log(cConfig().getLocalizedString(30166) + ' -> [guiElement]: Could not get MetaInformations for %s, mediaType not defined' % self.getTitle(), LOGERROR)
+            logger.error('-> [guiElement]: Could not get MetaInformations for %s, mediaType not defined' % self.getTitle())
             return False
         from resources.lib.tmdb import cTMDB
         oMetaget = cTMDB()

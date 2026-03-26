@@ -6,7 +6,8 @@ import resolveurl as resolver
 import threading
 
 from urllib.parse import urlparse
-from xbmc import LOGWARNING, log
+from resources.lib.logger import Logger
+
 
 class cConfig:
     _instances = {}  # Cache for addon_id -> cConfig instance
@@ -68,6 +69,6 @@ class cConfig:
             if i in domain.lower() or i.split('.')[0] in domain.lower(): return True, domain
         if checkResolver:   # Überprüfung in resolveUrl
             if resolver.relevant_resolvers(domain=domain) == []:
-                log('[xStream] -> [isblockedHoster]: In resolveUrl no domain for url: %s' % domain, LOGWARNING)
+                Logger.warning('-> [isblockedHoster]: In resolveUrl no domain for url: %s' % domain)
                 return True, domain    # Domain nicht in resolveUrl gefunden
         return False, domain

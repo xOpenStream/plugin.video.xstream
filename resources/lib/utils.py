@@ -7,7 +7,7 @@ import xbmcgui, xbmcvfs
 from xbmcvfs import translatePath
 from urllib.request import urlretrieve
 from resources.lib.config import cConfig
-from resources.lib.tools import logger
+from resources.lib.logger import Logger as logger
 
 progressDialog = xbmcgui.DialogProgress()
 

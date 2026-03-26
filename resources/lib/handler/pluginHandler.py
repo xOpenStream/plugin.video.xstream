@@ -7,7 +7,7 @@ import sys
 import xbmc
 
 from resources.lib.config import cConfig
-from xbmc import LOGINFO as LOGNOTICE, LOGERROR, log
+from resources.lib.logger import Logger as logger
 from resources.lib import utils
 from resources.lib.handler.requestHandler import cRequestHandler
 from urllib.parse import urlparse
@@ -25,10 +25,10 @@ class cPluginHandler:
         self.profilePath = translatePath(cConfig().getAddonInfo('profile'))
         self.pluginDBFile = os.path.join(self.profilePath, 'pluginDB')
 
-        log(cConfig().getLocalizedString(30166) + ' -> [pluginHandler]: profile folder: %s' % self.profilePath, LOGNOTICE)
-        log(cConfig().getLocalizedString(30166) + ' -> [pluginHandler]: root folder: %s' % self.rootFolder, LOGNOTICE)
+        logger.debug('-> [pluginHandler]: profile folder: %s' % self.profilePath)
+        logger.debug('-> [pluginHandler]: root folder: %s' % self.rootFolder)
         self.defaultFolder = os.path.join(self.rootFolder, 'sites')
-        log(cConfig().getLocalizedString(30166) + ' -> [pluginHandler]: default sites folder: %s' % self.defaultFolder, LOGNOTICE)
+        logger.debug('-> [pluginHandler]: default sites folder: %s' % self.defaultFolder)
 
 
     def getAvailablePlugins(self):
@@ -50,7 +50,7 @@ class cPluginHandler:
             except Exception:
                 pass
             if fileName not in pluginDB or modTime > plugin['modified'] or globalSearchStatus:
-                log(cConfig().getLocalizedString(30166) + ' -> [pluginHandler]: load plugin Informations for ' + str(fileName), LOGNOTICE)
+                logger.debug('-> [pluginHandler]: load plugin Informations for ' + str(fileName))
                 # try to import plugin
                 pluginData = self.__getPluginData(fileName, self.defaultFolder)
                 if pluginData:
@@ -68,7 +68,7 @@ class cPluginHandler:
         if update or deletions:
         #    self.__updateSettings(pluginDB) ToDo: Routine ist noch nicht fertig, daher deaktiviert
             self.__updatePluginDB(pluginDB) # Aktualisiert PluginDB in Addon_data
-            log(cConfig().getLocalizedString(30166) + ' -> [pluginHandler]: PluginDB informations updated.', LOGNOTICE)
+            logger.debug('-> [pluginHandler]: PluginDB informations updated.')
         return self.getAvailablePluginsFromDB()
 
 
@@ -106,7 +106,7 @@ class cPluginHandler:
         try:
             data = json.load(file)
         except ValueError:
-            log(cConfig().getLocalizedString(30166) + ' -> [pluginHandler]: pluginDB seems corrupt, creating new one', LOGERROR)
+            logger.error('-> [pluginHandler]: pluginDB seems corrupt, creating new one')
             data = dict()
         file.close()
         return data
@@ -190,13 +190,13 @@ class cPluginHandler:
             with open(self.settingsFile, 'w', encoding='utf-8') as f:
                 f.write('<?xml version=\'1.0\' encoding=\'utf-8\'?>\n' + content)
 
-            xbmc.log(f'settings.xml erfolgreich aktualisiert. Plugins entfernt: {self._removed_plugins}', LOGNOTICE)
+            logger.debug(f'settings.xml erfolgreich aktualisiert. Plugins entfernt: {self._removed_plugins}')
 
         except Exception as e:
             # Bei Fehler das Backup wiederherstellen
             if os.path.exists(backup_file):
                 shutil.copy2(backup_file, self.settingsFile)
-            xbmc.log(f'Fehler beim Aktualisieren der settings.xml: {str(e)}', LOGNOTICE)
+            logger.debug(f'Fehler beim Aktualisieren der settings.xml: {str(e)}')
 
     def _update_category_plugins(self, category, plugin_list, pluginDB):
         """
@@ -415,7 +415,7 @@ class cPluginHandler:
             plugin = __import__(fileName, globals(), locals())
             pluginData['name'] = plugin.SITE_NAME
         except Exception as e:
-            log(cConfig().getLocalizedString(30166) + " -> [pluginHandler]: Can't import plugin: %s" % fileName, LOGERROR)
+            logger.error(" -> [pluginHandler]: Can't import plugin: %s" % fileName)
             return False
         try:
             pluginData['identifier'] = plugin.SITE_IDENTIFIER
@@ -444,7 +444,7 @@ class cPluginHandler:
             plugin = __import__(fileName, globals(), locals())
             pluginData['name'] = plugin.SITE_NAME
         except Exception as e:
-            log(cConfig().getLocalizedString(30166) + " -> [pluginHandler]: Can't import plugin: %s" % fileName, LOGERROR)
+            logger.error(" -> [pluginHandler]: Can't import plugin: %s" % fileName)
             return False
         try:
             pluginData['active'] = plugin.ACTIVE
@@ -479,7 +479,7 @@ class cPluginHandler:
             plugin = __import__(fileName, globals(), locals())
             pluginDataDomain['identifier'] = plugin.SITE_IDENTIFIER
         except Exception as e:
-            log(cConfig().getLocalizedString(30166) + " -> [pluginHandler]: Can't import plugin: %s" % fileName, LOGERROR)
+            logger.error(" -> [pluginHandler]: Can't import plugin: %s" % fileName)
             return False
         try:
             pluginDataDomain['domain'] = plugin.DOMAIN
@@ -558,7 +558,7 @@ class cPluginHandler:
     # Überprüfung des Domain Namens. Leite um und hole neue URL und schreibe in die settings.xml. Bei nicht erreichen der Seite deaktiviere Globale Suche bis zum nächsten Start und überprüfe erneut.
     def checkDomain(self):
         import threading
-        log(cConfig().getLocalizedString(30166) + ' -> [checkDomain]: Query status code of the provider', LOGNOTICE)
+        logger.debug('-> [checkDomain]: Query status code of the provider')
         fileNames = self.__getFileNamesFromFolder(self.defaultFolder)
         threads = []
         for fileName in fileNames:
@@ -592,7 +592,7 @@ class cPluginHandler:
         for count, t in enumerate(threads):
             t.join()
 
-        log(cConfig().getLocalizedString(30166) + ' -> [checkDomain]: Domains for all available Plugins updated', LOGNOTICE)
+        logger.debug('-> [checkDomain]: Domains for all available Plugins updated')
         if threads:
             infoDialog(cConfig().getLocalizedString(30820), sound=False, icon='INFO', time=6000)
 
@@ -603,35 +603,35 @@ class cPluginHandler:
             oRequest.request()
             status_code = int(oRequest.getStatus())
             cConfig().setSetting('plugin_' + provider + '_status', str(status_code))  # setzte Status Code in die settings
-            log(cConfig().getLocalizedString(30166) + ' -> [checkDomain]: Status Code ' + str(status_code) + '  ' + provider + ': - ' + base_link, LOGNOTICE)
+            logger.debug('-> [checkDomain]: Status Code ' + str(status_code) + '  ' + provider + ': - ' + base_link)
 
             # Status 403 - bedeutet, dass der Zugriff auf eine angeforderte Ressource blockiert ist.
             # Status 404 - Seite nicht gefunden. Diese Meldung zeigt an, dass die Seite oder der Ordner auf dem Server, die aufgerufen werden sollten, nicht unter der angegebenen URL zu finden sind.
             if 403 <= status_code <= 503:  # Domain Interner Server Error und nicht erreichbar
                 cConfig().setSetting('global_search_' + provider, 'false')  # deaktiviere Globale Suche
-                log(cConfig().getLocalizedString(30166) + ' -> [checkDomain]: Internal Server Error for ' + provider + ' (DDOS Guard, HTTP Error, Cloudflare or BlazingFast active)', LOGNOTICE)
+                logger.debug('-> [checkDomain]: Internal Server Error for ' + provider + ' (DDOS Guard, HTTP Error, Cloudflare or BlazingFast active)')
 
             # Status 301 - richtet Ihr auf Eurem Server ein, wenn sich die URL geändert hat, Eure Domain umgezogen ist oder sich ein Inhalt anderweitig verschoben hat.
             elif 300 <= status_code <= 400:  # Domain erreichbar mit Umleitung
                 url = oRequest.getRealUrl()
                 cConfig().setSetting('plugin_' + provider + '.domain', urlparse(url).hostname)  # setze Domain in die settings.xml
                 cConfig().setSetting('global_search_' + provider, 'true')  # aktiviere Globale Suche
-                log(cConfig().getLocalizedString(30166) + ' -> [checkDomain]: globalSearch for ' + provider + ' is activated.', LOGNOTICE)
+                logger.debug('-> [checkDomain]: globalSearch for ' + provider + ' is activated.')
 
             # Status 200 - Dieser Code wird vom Server zurückgegeben, wenn er den Request eines Browsers korrekt zurückgeben kann. Für die Ausgabe des Codes und des Inhalts der Seite muss der Server die Anfrage zunächst akzeptieren.
             elif status_code == 200:  # Domain erreichbar
                 cConfig().setSetting('plugin_' + provider + '.domain', urlparse(base_link).hostname)  # setze URL_MAIN in die settings.xml
                 cConfig().setSetting('global_search_' + provider, 'true')  # aktiviere Globale Suche
-                log(cConfig().getLocalizedString(30166) + ' -> [checkDomain]: globalSearch for ' + provider + ' is activated.', LOGNOTICE)
+                logger.debug('-> [checkDomain]: globalSearch for ' + provider + ' is activated.')
             # Wenn keiner der Status oben greift
             else:
-                log(cConfig().getLocalizedString(30166) + ' -> [checkDomain]: Error ' + provider + ' not available.', LOGNOTICE)
+                logger.debug('-> [checkDomain]: Error ' + provider + ' not available.')
                 cConfig().setSetting('global_search_' + provider, 'false')  # deaktiviere Globale Suche
                 cConfig().setSetting('plugin_' + provider + '.domain', '')  # lösche Settings Eintrag
-                log(cConfig().getLocalizedString(30166) + ' -> [checkDomain]: globalSearch for ' + provider + ' is deactivated.', LOGNOTICE)
+                logger.debug('-> [checkDomain]: globalSearch for ' + provider + ' is deactivated.')
         except:
             # Wenn Timeout und die Seite Offline ist
             cConfig().setSetting('global_search_' + provider, 'false')  # deaktiviere Globale Suche
             cConfig().setSetting('plugin_' + provider + '.domain', '')  # lösche Settings Eintrag
-            log(cConfig().getLocalizedString(30166) + ' -> [checkDomain]: Error ' + provider + ' not available.', LOGNOTICE)
+            logger.error('-> [checkDomain]: Error ' + provider + ' not available.')
             pass

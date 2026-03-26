@@ -9,7 +9,7 @@ def main():
     import os
 
     from resources.lib.config import cConfig
-    from resources.lib.tools import logger
+    from resources.lib.logger import Logger as logger
     from xbmcvfs import translatePath
 
     _addonPath_ = translatePath(cConfig().getAddonInfo('path'))
@@ -20,9 +20,8 @@ def main():
     sys.path.append(join(_addonPath_, 'resources', 'art'))
     sys.path.append(join(_addonPath_, 'sites'))    
     
-    LOGMESSAGE = cConfig().getLocalizedString(30166)
-    logger.debug(LOGMESSAGE + ' -> [default]: Start xStream Log, Version %s ' % cConfig().getAddonInfo('version'))
-    logger.debug(LOGMESSAGE + ' -> [default]: Python-Version: %s' % platform.python_version())
+    logger.debug('Start xStream Log, Version %s ' % cConfig().getAddonInfo('version'))
+    logger.debug('Python-Version: %s' % platform.python_version())
 
     # RunScript handler for changelog button in settings
     if len(sys.argv) > 1 and sys.argv[1] == 'changelog':
@@ -43,7 +42,7 @@ def main():
         parseUrl()
     except Exception as e:
         if str(e) == 'UserAborted':
-            logger.debug(LOGMESSAGE + ' -> [default]: User aborted list creation');
+            logger.debug('User aborted list creation');
         else:
             import traceback
             import xbmcgui
