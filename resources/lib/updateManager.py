@@ -10,9 +10,10 @@ import zipfile
 from requests.auth import HTTPBasicAuth
 from resources.lib.config import cConfig
 from resources.lib.tools import infoDialog
+from resources.lib.logger import logger
 from xbmc import executebuiltin
 from xbmcvfs import translatePath
-from resources.lib.logger import Logger as logger
+
 
 # Resolver
 def resolverUpdate():
@@ -45,9 +46,6 @@ def UpdateResolve(username, resolve_dir, resolve_id, branch, token):
         LOCAL_PLUGIN_VERSION = os.path.join(ADDON_DIR, "update_sha")    # Pfad der update.sha in den ResolveURL Daten
         LOCAL_FILE_NAME_PLUGIN = os.path.join(ADDON_DIR, 'update-' + resolve_id + '.zip')
         if not os.path.exists(ADDON_DIR): os.mkdir(ADDON_DIR)
-        
-        if cConfig().getSetting('enforceUpdate') == 'true':
-            if os.path.exists(LOCAL_PLUGIN_VERSION): os.remove(LOCAL_PLUGIN_VERSION)
             
         commitXML = _getXmlString(REMOTE_PLUGIN_COMMITS, auth)  # Commit Update
         if commitXML:
@@ -95,13 +93,12 @@ def commitUpdate(onlineFile, offlineFile, downloadLink, LocalDir, plugin_id, loc
 
 def doUpdate(LocalDir, REMOTE_PATH, Title, localFileName, auth):
     try:
-        response = requests.get(REMOTE_PATH, auth=auth, timeout=10)  # verify=False,
+        response = requests.get(REMOTE_PATH, auth=auth, timeout=8)  # verify=False,
         if response.status_code == 200:
             open(localFileName, "wb").write(response.content)
         else:
             return False
         updateFile = zipfile.ZipFile(localFileName)
-        removeFilesNotInRepo(updateFile, LocalDir)
         for index, n in enumerate(updateFile.namelist()):
             if n[-1] != "/":
                 dest = os.path.join(LocalDir, "/".join(n.split("/")[1:]))
@@ -125,50 +122,26 @@ def doUpdate(LocalDir, REMOTE_PATH, Title, localFileName, auth):
         return False
 
 
-def removeFilesNotInRepo(updateFile, LocalDir):
-    ignored_files = ['settings.xml', 'aniworld.py', 'aniworld.png']
-    updateFileNameList = [i.split("/")[-1] for i in updateFile.namelist()]
-
-    for root, dirs, files in os.walk(LocalDir):
-        if ".git" in root or ".idea" in root:
-            continue
-        else:
-            for file in files:
-                if file in ignored_files:
-                    continue
-                if file not in updateFileNameList:
-                    os.remove(os.path.join(root, file))
-
-
 def _getXmlString(xml_url, auth):
     try:
-        xmlString = requests.get(xml_url, auth=auth, timeout=10).content  # verify=False,
+        xmlString = requests.get(xml_url, auth=auth, timeout=8).content  # verify=False,
         if "sha" in json.loads(xmlString):
             return xmlString
         else:
             logger.error('-> [updateManager]: Update-URL incorrect or bad credentials')
     except Exception as e:
-        logger.error(e)
+        logger.error(str(e))
 
 
-# todo Verzeichnis packen -für zukünftige Erweiterung "Backup"
-def zipfolder(foldername, target_dir):
-    zipobj = zipfile.ZipFile(foldername + '.zip', 'w', zipfile.ZIP_DEFLATED)
-    rootlen = len(target_dir) + 1
-    for base, dirs, files in os.walk(target_dir):
-        for file in files:
-            fn = os.path.join(base, file)
-            zipobj.write(fn, fn[rootlen:])
-    zipobj.close()
-
-
-def devUpdates():  # für manuelles Updates vorgesehen
+def manualResolverUpdate():  # für manuelles Updates vorgesehen
     try:
         cConfig().setSetting('resolver.branch', 'release')
+        # SHA löschen → erzwingt frischen Download
+        sha_path = os.path.join(translatePath('special://userdata/addon_data/script.module.resolveurl'), 'update_sha')
+        if os.path.exists(sha_path): os.remove(sha_path)
         status = resolverUpdate()
         if status == True:  infoDialog(cConfig().getLocalizedString(30116), sound=False, icon='INFO', time=6000)
         if status == False: infoDialog(cConfig().getLocalizedString(30117), sound=True, icon='ERROR')
         if status == None:  infoDialog(cConfig().getLocalizedString(30118), sound=False, icon='INFO', time=6000)
-        if cConfig().getSetting('enforceUpdate') == 'true': cConfig().setSetting('enforceUpdate', 'false')
     except Exception as e:
-        logger.error(e)
+        logger.error(str(e))

@@ -3,7 +3,7 @@
 
 from resources.lib.tools import cParser, cUtil
 from resources.lib.config import cConfig
-from resources.lib.logger import Logger as logger
+from resources.lib.logger import logger
 from os import path
 
 class cGuiElement:

@@ -6,41 +6,40 @@ import xbmc
 import xbmcaddon
 from urllib.parse import parse_qsl, urlsplit
 
-class Logger:
+
+class logger:
     ADDON_NAME = xbmcaddon.Addon().getAddonInfo('name')
 
     @staticmethod
     def info(sInfo):
-        Logger.__writeLog(sInfo, cLogLevel=xbmc.LOGINFO)
+        logger.__writeLog(sInfo, cLogLevel=xbmc.LOGINFO)
 
     @staticmethod
     def debug(sInfo):
-        Logger.__writeLog(sInfo, cLogLevel=xbmc.LOGDEBUG)
+        logger.__writeLog(sInfo, cLogLevel=xbmc.LOGDEBUG)
 
     @staticmethod
     def warning(sInfo):
-        Logger.__writeLog(sInfo, cLogLevel=xbmc.LOGWARNING)
+        logger.__writeLog(sInfo, cLogLevel=xbmc.LOGWARNING)
 
     @staticmethod
     def error(sInfo):
-        Logger.__writeLog(sInfo, cLogLevel=xbmc.LOGERROR)
+        logger.__writeLog(sInfo, cLogLevel=xbmc.LOGERROR)
 
     @staticmethod
     def fatal(sInfo):
-        Logger.__writeLog(sInfo, cLogLevel=xbmc.LOGFATAL)
+        logger.__writeLog(sInfo, cLogLevel=xbmc.LOGFATAL)
 
     @staticmethod
     def __writeLog(sLog, cLogLevel=xbmc.LOGDEBUG):
-        params = dict()
-        if len(sys.argv) >= 3 and len(sys.argv[2]) > 0:
-            params = dict(parse_qsl(urlsplit(sys.argv[2]).query))
         try:
+            params = dict()
+            if len(sys.argv) >= 3 and len(sys.argv[2]) > 0:
+                params = dict(parse_qsl(urlsplit(sys.argv[2]).query))
             if 'site' in params:
-                site = params['site']
-                sLog = f"[{Logger.ADDON_NAME}] -> [{site}] {sLog}"
+                sLog = "[%s] -> [%s]: %s" % (logger.ADDON_NAME, params['site'], sLog)
             else:
-                sLog = f"[{Logger.ADDON_NAME}] {sLog}"
+                sLog = "[%s] %s" % (logger.ADDON_NAME, sLog)
             xbmc.log(sLog, cLogLevel)
         except Exception as e:
-            xbmc.log(f'Logging Failure: {e}', cLogLevel)
-            pass
+            xbmc.log('Logging Failure: %s' % e, cLogLevel)

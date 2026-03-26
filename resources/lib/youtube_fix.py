@@ -9,6 +9,7 @@ import xbmc
 import xbmcvfs
 
 from resources.lib.config import cConfig
+from resources.lib.logger import logger
 
 # Pfad zur api_keys.json im YouTube Addon Userdata
 storedb = xbmcvfs.translatePath('special://home/userdata/addon_data/plugin.video.youtube/api_keys.json')
@@ -46,4 +47,4 @@ def YT():
             with open(storedb, 'w') as f:
                 json.dump(data, f, indent=4)
         except Exception as e:
-            xbmc.log('[xStream] youtube_fix: Fehler beim Schreiben der api_keys.json: %s' % str(e), xbmc.LOGERROR)
+            logger.error('-> [youtube_fix]: youtube_fix: Fehler beim Schreiben der api_keys.json: %s' % str(e))

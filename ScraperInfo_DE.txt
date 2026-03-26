@@ -1,72 +1,892 @@
-Scaper Aufbau
--------------
+Scraper Aufbau — Anleitung für xStream Site-Plugins
+====================================================
 
-# Imports bitte alle oben für den Überblick !
 
+============================================================================
+1. IMPORTS
+============================================================================
+
+Imports bitte alle oben im File für den Überblick!
+xbmcgui wird für den Such-Cache benötigt (Window Properties).
+
+import xbmcgui
 from resources.lib.handler.ParameterHandler import ParameterHandler
 from resources.lib.handler.requestHandler import cRequestHandler
-from resources.lib.tools import cParser, cUtil
-from resources.lib.logger import Logger
+from resources.lib.tools import logger, cParser, cUtil
 from resources.lib.gui.guiElement import cGuiElement
 from resources.lib.config import cConfig
 from resources.lib.gui.gui import cGui
 
-----------------------------------------------------------------------------
 
-# Namen für Quellen
+============================================================================
+2. GRUNDKONFIGURATION
+============================================================================
 
-SITE_IDENTIFIER = 				''
-SITE_NAME = 					''
-SITE_ICON = 					''
-URL_MAIN = 						''
-URL_MOVIES = 					''
-URL_POPULAR_MOVIES = URL_MAIN + ''
-URL_KINO = URL_MAIN + 			''
-URL_SERIES = URL_MAIN + 		''
-URL_POPULAR_SERIES = URL_MAIN + ''
-URL_POPULAR = URL_MAIN + 		''
-URL_GENRE = URL_MAIN + 			''
-URL_SEARCH = URL_MAIN + 		''
-URL_LOGIN = URL_MAIN + 			''
-URL_ENGLISH = URL_MAIN + 		''
-URL_NEW = URL_MAIN + 			''
-URL_ANIMATION = URL_MAIN + 		''
-URL_DOKU = URL_MAIN + 			''
+Jedes Site-Plugin braucht diese Variablen am Anfang:
 
-----------------------------------------------------------------------------
+# Eindeutiger Bezeichner — muss dem Dateinamen ohne .py entsprechen
+SITE_IDENTIFIER = 'filmpalast'
 
-# Einbau der Sprachfunktion in Indexseiten
+# Anzeigename im xStream Menü
+SITE_NAME = 'Filmpalast'
 
-	-	sLanguage = cConfig().getSetting('prefLanguage')	# Sprachauswahl aus settings.xml daraus eine Standard def schreiben
-		params.setParam('sLanguage', sLanguage)
-	0 = Alle Sprachen
-	1 = Deutsch
-	2 = English
-	3 = Japanisch
+# Icon-Dateiname (liegt in resources/art/sites/)
+SITE_ICON = 'filmpalast.png'
 
-	# z.B. beim Menü
-	def load():
-		Logger.info('Load %s' % SITE_NAME)
-		params = ParameterHandler()
-		# Spracheinstellung aus der settings.xml
-		sLanguage = cConfig().getSetting('prefLanguage')
-		if sLanguage == '1':	# 1 = Deutsch
-			sLanguage = '2'
-		elif sLanguage == '2':	# 2 = Englisch
-			sLanguage = '3'
-		else:
-			sLanguage = 'all'	# 0 = Alle Sprachen
-		params.setParam('sLanguage', sLanguage)	
-		params.setParam('sUrl', URL_KINO)
-		cGui().addFolder(cGuiElement('Aktuelle Kinofilme', SITE_IDENTIFIER, 'showEntries'), params) # cConfig().getLocalizedString(30500) setzen für den jeweiligen Eintrag
-		cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30500), SITE_IDENTIFIER, 'showEntries'), params)
-		
-----------------------------------------------------------------------------
+--- URLs ---
 
-# Einbau der Qualitätfunktion in Indexseiten		
-	
+URL_MAIN = 'https://' + DOMAIN
+URL_MOVIES = URL_MAIN + '/movies/'
+URL_KINO = URL_MAIN + '/kino/'
+URL_SERIES = URL_MAIN + '/serien/'
+URL_SEARCH = URL_MAIN + '/?s=%s'
 
-	-	sQuality = cConfig().getSetting('preferedQuality')	# Qualitätsauswahl aus settings.xml daraus eine Standard def schreiben
-		params.setParam('sQuality', sQuality)
-		
-----------------------------------------------------------------------------
+--- Domain-Konfiguration ---
+
+Die Domain wird aus den xStream Einstellungen gelesen.
+So kann der User die Domain ändern falls sie sich ändert,
+ohne dass das Site-Plugin angepasst werden muss.
+
+DOMAIN = cConfig().getSetting('plugin_' + SITE_IDENTIFIER + '.domain', 'filmpalast.to')
+STATUS = cConfig().getSetting('plugin_' + SITE_IDENTIFIER + '_status')
+ACTIVE = cConfig().getSetting('plugin_' + SITE_IDENTIFIER)
+URL_MAIN = 'https://' + DOMAIN
+
+--- Globale Suche ---
+
+Die globale Suche durchsucht alle aktivierten Site-Plugins gleichzeitig.
+Kann pro Site deaktiviert werden:
+
+if cConfig().getSetting('global_search_' + SITE_IDENTIFIER) == 'false':
+    SITE_GLOBAL_SEARCH = False
+    logger.info('-> [SitePlugin]: globalSearch for %s is deactivated.' % SITE_NAME)
+
+
+============================================================================
+3. MEDIATYPE (Pflicht!)
+============================================================================
+
+MediaType MUSS bei jedem GuiElement gesetzt werden.
+
+Warum ist das wichtig?
+  - Trailer:    Die Trailer-Suche braucht den MediaType um zu wissen ob es
+                ein Film ('movie') oder eine Serie ('tv') ist. Ohne MediaType
+                funktioniert die Trailer-Suche nicht korrekt.
+  - Kodi:       Kodi zeigt Filme und Serien unterschiedlich an (anderes Layout,
+                andere Sortierung, andere Infos).
+  - TMDB:       Die Metadaten-Abfrage (Poster, Beschreibung, Bewertung) braucht
+                den MediaType um beim richtigen Endpunkt zu suchen.
+  - Such-Cache: Die globale Suche unterscheidet zwischen Filmen und Serien
+                und sortiert die Ergebnisse entsprechend.
+
+Erlaubte Werte:
+  'movie'     Film
+  'tvshow'    Serie (Haupteintrag / Übersicht)
+  'season'    Staffel
+  'episode'   Einzelne Episode
+
+--- Wann welchen Wert setzen? ---
+
+Situation 1: Gemischter Inhalt — Standard (Filme + Serien auf einer Seite)
+    Viele Seiten wie Filmpalast oder TopStreamFilm haben Filme und Serien gemischt.
+    Hier muss pro Eintrag erkannt werden ob es ein Film oder eine Serie ist.
+    Standard-Richtung: prüfe ob Serie, sonst Film.
+
+    oGuiElement.setMediaType('tvshow' if isTvshow else 'movie')
+
+Situation 2: Gemischter Inhalt — Umgekehrt (Standard ist Serie, prüfe ob Film)
+    Manche Seiten (z.B. AniWorld) sind primär Serien-Seiten, haben aber auch
+    einzelne Filme. Hier ist die Logik umgedreht: Standard ist Serie,
+    nur wenn explizit ein Film erkannt wird, setze 'movie'.
+
+    oGuiElement.setMediaType('movie' if isMovie else 'tvshow')
+
+    AniWorld nutzt das z.B. in der Staffel-Ansicht — wenn die URL auf
+    '/filme' endet, ist es ein Film, sonst eine Staffel:
+
+    isMovie = sUrl.endswith('filme')
+    oGuiElement.setMediaType('season' if not isMovie else 'movie')
+
+    Und in der Episoden-Ansicht — wenn es eine Filmliste ist,
+    zeige 'movie' statt 'episode':
+
+    oGuiElement.setMediaType('episode' if not isMovieList else 'movie')
+
+Situation 3: Nur Serien (z.B. SerienStream, AniWorld, BurningSeries)
+    Wenn die Seite ausschließlich Serien hat, einfach fest setzen:
+
+    oGuiElement.setMediaType('tvshow')
+
+Situation 4: Nur Filme (z.B. Einschalten, InternetArchive)
+    Wenn die Seite ausschließlich Filme hat:
+
+    oGuiElement.setMediaType('movie')
+
+Situation 5: Getrennte Funktionen (z.B. Streamcloud)
+    Manche Seiten haben separate Funktionen für Filme und Serien.
+    Dann wird der MediaType in jeder Funktion fest gesetzt:
+
+    def showMovieEntries():    # Nur Filme
+        oGuiElement.setMediaType('movie')
+
+    def showSeriesEntries():   # Nur Serien
+        oGuiElement.setMediaType('tvshow')
+
+Situation 6: Staffel-Ansicht
+    oGuiElement.setMediaType('season')
+    oGuiElement.setSeason(sSeason)
+
+Situation 7: Episoden-Ansicht
+    oGuiElement.setMediaType('episode')
+
+
+============================================================================
+4. FILM/SERIE ERKENNUNG (TMDB)
+============================================================================
+
+Wenn eine Seite gemischten Inhalt hat, muss pro Eintrag erkannt werden
+ob es ein Film oder eine Serie ist. Es gibt zwei Methoden:
+
+--- Methode 1: Erkennung über Laufzeit ---
+
+Einfachste Methode: Wenn die Laufzeit unter einem bestimmten Wert liegt
+(z.B. 70 Minuten), ist es wahrscheinlich eine Serie.
+
+    isDuration, sDuration = cParser.parseSingleResult(sDummy, r'time">([\d]+)')
+    if int(sDuration) <= 70:
+        isTvshow = True
+    else:
+        isTvshow = False
+
+Problem: Nicht immer zuverlässig. Manche Filme sind kurz, manche
+Serienepisoden sind lang.
+
+--- Methode 2: Erkennung über TMDB (genauer) ---
+
+TMDB wird gefragt ob der Titel ein bekannter Film ist.
+Wenn ja → Film. Wenn nicht → wahrscheinlich Serie.
+
+    from resources.lib.tmdb import cTMDB
+    oMetaget = cTMDB()
+    if oMetaget:
+        if isYear:
+            meta = oMetaget.search_movie_name(sName, year=sYear)
+        else:
+            meta = oMetaget.search_movie_name(sName)
+        if meta and 'id' in meta:
+            isTvshow = False    # TMDB hat den Film gefunden
+        else:
+            isTvshow = True     # Nicht als Film gefunden → Serie
+    else:
+        isTvshow = False        # TMDB nicht verfügbar → Fallback auf Film
+
+--- Methode 3: Kombination (empfohlen) ---
+
+Erst Laufzeit prüfen, dann bei Bedarf TMDB fragen:
+
+    isDuration, sDuration = cParser.parseSingleResult(sDummy, r'time">([\d]+)')
+    if int(sDuration) <= 70:
+        isTvshow = True
+    else:
+        from resources.lib.tmdb import cTMDB
+        oMetaget = cTMDB()
+        if not oMetaget:
+            isTvshow = False
+        else:
+            if isYear:
+                meta = oMetaget.search_movie_name(sName, year=sYear)
+            else:
+                meta = oMetaget.search_movie_name(sName)
+            if meta and 'id' in meta:
+                isTvshow = False
+            else:
+                isTvshow = True
+
+--- Danach MediaType und Funktion setzen ---
+
+    oGuiElement = cGuiElement(sName, SITE_IDENTIFIER, 'showSeasons' if isTvshow else 'showHosters')
+    oGuiElement.setMediaType('tvshow' if isTvshow else 'movie')
+
+Erklärung:
+  - Wenn Serie: Klick führt zu showSeasons() (Staffel-Auswahl)
+  - Wenn Film:  Klick führt zu showHosters() (Hoster-Auswahl)
+
+
+============================================================================
+5. SUCH-CACHE (Site-interne Suche)
+============================================================================
+
+Der Such-Cache speichert den Suchbegriff als Kodi Window-Property.
+Damit muss der User den Suchbegriff nicht erneut eingeben wenn er nach
+der Wiedergabe eines Films/Trailers zurücknavigiert.
+
+--- Wie funktioniert es? ---
+
+Der Cache nutzt Window(10000) — das ist Kodis globales Home-Window.
+Properties die dort gesetzt werden bleiben bestehen bis Kodi beendet wird
+oder bis sie explizit gelöscht werden.
+
+Property-Name:  xstream.<SITE_IDENTIFIER>.lastSearchText
+Beispiele:      xstream.filmpalast.lastSearchText
+                xstream.topstreamfilm.lastSearchText
+                xstream.hdfilme.lastSearchText
+
+--- Ablauf Schritt für Schritt ---
+
+1. User öffnet Site-Menü (load())
+   → Such-Cache wird geleert (damit alte Suchbegriffe nicht hängen bleiben)
+
+2. User klickt auf "Suche" (showSearch())
+   → Kein Cache vorhanden → Tastatur öffnet sich
+   → User tippt Suchbegriff ein
+   → Suchbegriff wird als Window Property gespeichert
+   → Suche wird ausgeführt, Ergebnisse angezeigt
+
+3. User wählt einen Film/Serie aus → schaut Trailer oder Stream
+
+4. User navigiert zurück zur Suchliste (showSearch() wird erneut aufgerufen)
+   → Cache vorhanden → Suchbegriff wird aus Property gelesen
+   → KEINE Tastatur → Suche läuft direkt mit dem gecachten Begriff
+   → Ergebnisse erscheinen sofort
+
+5. User navigiert weiter zurück ins Site-Menü (load())
+   → Cache wird geleert → nächste Suche startet frisch
+
+--- Implementierung ---
+
+Muss an ZWEI Stellen eingebaut werden:
+
+  1. In load()       — Cache leeren
+  2. In showSearch() — Cache lesen oder Tastatur öffnen
+
+Wichtig: xbmcgui muss oben im File importiert sein!
+
+--- Stelle 1: In load() — Cache leeren ---
+
+def load():
+    logger.info('Load %s' % SITE_NAME)
+    xbmcgui.Window(10000).clearProperty('xstream.<SITE_IDENTIFIER>.lastSearchText')
+    params = ParameterHandler()
+    # ... Menü-Einträge ...
+    cGui().setEndOfDirectory()
+
+--- Stelle 2: In showSearch() — Cache nutzen ---
+
+def showSearch():
+    win = xbmcgui.Window(10000)
+    sSearchText = win.getProperty('xstream.<SITE_IDENTIFIER>.lastSearchText')
+    if not sSearchText:
+        sSearchText = cGui().showKeyBoard(sHeading=cConfig().getLocalizedString(30281))
+        if not sSearchText: return
+        win.setProperty('xstream.<SITE_IDENTIFIER>.lastSearchText', sSearchText)
+    _search(False, sSearchText)
+    cGui().setEndOfDirectory()
+
+Hinweis: setProperty() wird NUR aufgerufen wenn der User tatsächlich neu
+über die Tastatur eingegeben hat. Kommt der Suchbegriff aus dem Cache,
+wird er direkt weiterverwendet ohne erneut gesetzt zu werden.
+
+
+============================================================================
+6. HTML-CACHE (Request-Cache)
+============================================================================
+
+Der requestHandler hat einen eingebauten HTML-Cache.
+Damit werden Seiteninhalte nicht bei jedem Aufruf neu geladen.
+Die Cache-Zeiten werden in Sekunden angegeben.
+
+Empfohlene Cache-Zeiten:
+  Menüseiten / Kategorien:  48 Stunden  (selten ändern sich Kategorien)
+  Filmlisten / Einträge:     6 Stunden  (neue Filme kommen regelmäßig)
+  Staffel-Listen:            6 Stunden  (Staffeln ändern sich selten)
+  Episodenlisten:            4 Stunden  (Episoden ändern sich selten)
+  Hoster-Links:              KEIN Cache (caching=False, immer frisch laden!)
+
+Beispiel mit Cache:
+    oRequest = cRequestHandler(sUrl)
+    if cConfig().getSetting('global_search_' + SITE_IDENTIFIER) == 'true':
+        oRequest.cacheTime = 60 * 60 * 6  # 6 Stunden
+    sHtmlContent = oRequest.request()
+
+Für Hoster-Links IMMER Cache deaktivieren (Links ändern sich ständig):
+    sHtmlContent = cRequestHandler(sUrl, caching=False).request()
+
+
+============================================================================
+7. FUNKTIONS-TEMPLATES
+============================================================================
+
+Hier die Standard-Funktionen die jedes Site-Plugin braucht.
+Die HTML-Patterns müssen an die jeweilige Seite angepasst werden,
+aber die Struktur bleibt immer gleich.
+
+--- 7.1 load() — Hauptmenü ---
+
+def load():
+    logger.info('Load %s' % SITE_NAME)
+    xbmcgui.Window(10000).clearProperty('xstream.<SITE_IDENTIFIER>.lastSearchText')
+    params = ParameterHandler()
+    params.setParam('sUrl', URL_KINO)
+    cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30501), SITE_IDENTIFIER, 'showEntries'), params)
+    params.setParam('sUrl', URL_MOVIES)
+    cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30562), SITE_IDENTIFIER, 'showEntries'), params)
+    params.setParam('sUrl', URL_SERIES)
+    cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30511), SITE_IDENTIFIER, 'showEntries'), params)
+    params.setParam('Value', 'KATEGORIEN')
+    cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30506), SITE_IDENTIFIER, 'showValue'), params)
+    cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30564), SITE_IDENTIFIER, 'showYearSearch'))
+    cGui().addFolder(cGuiElement(cConfig().getLocalizedString(30520), SITE_IDENTIFIER, 'showSearch'), params)
+    cGui().setEndOfDirectory()
+
+Wichtig:
+  - clearProperty() am Anfang → Such-Cache leeren
+  - Jeder Menüeintrag braucht einen cGuiElement mit:
+    - Anzeigename (am besten getLocalizedString für Mehrsprachigkeit)
+    - SITE_IDENTIFIER (damit xStream weiß welches Plugin)
+    - Funktionsname der aufgerufen wird (z.B. 'showEntries')
+
+
+--- 7.2 showEntries() — Film-/Serienlisten ---
+
+def showEntries(entryUrl=False, sGui=False, sSearchText=False, sSearchPageText=False):
+    oGui = sGui if sGui else cGui()
+    params = ParameterHandler()
+    isTvshow = False
+    if not entryUrl: entryUrl = params.getValue('sUrl')
+
+    oRequest = cRequestHandler(entryUrl, ignoreErrors=(sGui is not False))
+    if cConfig().getSetting('global_search_' + SITE_IDENTIFIER) == 'true':
+        oRequest.cacheTime = 60 * 60 * 6  # 6 Stunden
+    sHtmlContent = oRequest.request()
+
+    # Pattern an die Seite anpassen!
+    pattern = 'class="item">.*?href="([^"]+).*?src="([^"]+).*?title">([^<]+)(.*?)</div>'
+    isMatch, aResult = cParser.parse(sHtmlContent, pattern)
+    if not isMatch:
+        if not sGui: oGui.showInfo()
+        return
+
+    total = len(aResult)
+    for sUrl, sThumbnail, sName, sDummy in aResult:
+        # Bei Suche: nur Treffer anzeigen die zum Suchbegriff passen
+        if sSearchText and not cParser.search(sSearchText, sName):
+            continue
+
+        # Jahr und Qualität aus dem HTML extrahieren
+        isYear, sYear = cParser.parseSingleResult(sDummy, r'year">([\d]+)')
+        isQuality, sQuality = cParser.parseSingleResult(sDummy, 'quality">([^<]+)')
+        isDesc, sDesc = cParser.parseSingleResult(sDummy, 'description"><p>([^<]+)')
+
+        # Film/Serie Erkennung (siehe Abschnitt 4)
+        # ... isTvshow = True/False ...
+
+        # GuiElement erstellen
+        oGuiElement = cGuiElement(sName, SITE_IDENTIFIER, 'showSeasons' if isTvshow else 'showHosters')
+        oGuiElement.setMediaType('tvshow' if isTvshow else 'movie')   # PFLICHT!
+        oGuiElement.setThumbnail(sThumbnail)
+        if isYear:
+            oGuiElement.setYear(sYear)
+        if isQuality:
+            oGuiElement.setQuality(sQuality)
+        if isDesc:
+            oGuiElement.setDescription(sDesc)
+
+        # Parameter für die nächste Funktion setzen
+        params.setParam('entryUrl', sUrl)
+        params.setParam('sThumbnail', sThumbnail)
+        params.setParam('sDesc', sDesc)
+        oGui.addFolder(oGuiElement, params, isTvshow, total)
+
+    # Pagination und View NUR wenn nicht aus globaler Suche
+    if not sGui and not sSearchText and not sSearchPageText:
+        isMatchNextPage, sNextUrl = cParser.parseSingleResult(sHtmlContent, 'href="([^"]+)">Next')
+
+        # Seitensprung-Funktion (optional, siehe 7.10)
+        isMatchSiteSearch, sHtmlContainer = cParser.parseSingleResult(sHtmlContent, 'class="wp-pagenavi">(.*?)Next')
+        if isMatchSiteSearch:
+            isMatch, aResult = cParser.parse(sHtmlContainer, r'<span>([\d]+)</span>.*?nav_ext">.*?">([\d]+)</a>.*?href="([^"]+)')
+            if isMatch:
+                for sPageActive, sPageLast, sNextPage in aResult:
+                    sPageName = cConfig().getLocalizedString(30284) + str(sPageActive) + cConfig().getLocalizedString(30285) + str(sPageLast) + cConfig().getLocalizedString(30286)
+                    params.setParam('sNextPage', sNextPage)
+                    params.setParam('sPageLast', sPageLast)
+                    oGui.searchNextPage(sPageName, SITE_IDENTIFIER, 'showSearchPage', params)
+
+        if isMatchNextPage:
+            params.setParam('sUrl', sNextUrl)
+            oGui.addNextPage(SITE_IDENTIFIER, 'showEntries', params)
+        oGui.setView('tvshows' if isTvshow else 'movies')
+        oGui.setEndOfDirectory()
+
+Parameter erklärt:
+  entryUrl        — URL der Seite (oder False → aus ParameterHandler)
+  sGui            — GUI-Objekt von der globalen Suche (oder False)
+  sSearchText     — Suchbegriff zum Filtern (oder False)
+  sSearchPageText — Seitennummer vom Seitensprung (oder False)
+
+Wenn sGui gesetzt ist, kommt der Aufruf von der globalen Suche.
+Dann KEIN setEndOfDirectory() und KEINE Pagination!
+
+
+--- 7.3 showSeasons() — Staffel-Auswahl ---
+
+Wird aufgerufen wenn der User auf eine Serie klickt.
+Zeigt alle verfügbaren Staffeln an.
+
+def showSeasons():
+    params = ParameterHandler()
+    sUrl = params.getValue('entryUrl')
+    sThumbnail = params.getValue('sThumbnail')
+    isDesc = params.getValue('sDesc')
+
+    oRequest = cRequestHandler(sUrl)
+    if cConfig().getSetting('global_search_' + SITE_IDENTIFIER) == 'true':
+        oRequest.cacheTime = 60 * 60 * 6  # 6 Stunden
+    sHtmlContent = oRequest.request()
+
+    # Pattern für Staffeln — an die Seite anpassen!
+    pattern = '<div class="season">(.*)</ul>'
+    isMatch, sHtmlContainer = cParser.parseSingleResult(sHtmlContent, pattern)
+    if isMatch:
+        isMatch, aResult = cParser.parse(sHtmlContainer, r'"#season-(\d+)')
+    if not isMatch:
+        cGui().showInfo()
+        return
+
+    total = len(aResult)
+    for sSeason in aResult:
+        oGuiElement = cGuiElement(cConfig().getLocalizedString(30512) + ' ' + str(sSeason), SITE_IDENTIFIER, 'showEpisodes')
+        oGuiElement.setSeason(sSeason)
+        oGuiElement.setMediaType('season')        # PFLICHT!
+        oGuiElement.setThumbnail(sThumbnail)
+        if isDesc:
+            oGuiElement.setDescription(isDesc)
+        cGui().addFolder(oGuiElement, params, True, total)
+    cGui().setView('seasons')
+    cGui().setEndOfDirectory()
+
+Wichtig:
+  - setSeason() setzt die Staffelnummer
+  - setMediaType('season') ist Pflicht
+  - setView('seasons') für korrekte Kodi-Darstellung
+  - params werden automatisch weitergereicht (entryUrl, sThumbnail etc.)
+
+
+--- 7.4 showEpisodes() — Episoden-Auswahl ---
+
+Wird aufgerufen wenn der User auf eine Staffel klickt.
+Zeigt alle Episoden dieser Staffel an.
+
+def showEpisodes():
+    params = ParameterHandler()
+    entryUrl = params.getValue('entryUrl')
+    sThumbnail = params.getValue('sThumbnail')
+    sSeason = params.getValue('season')
+    isDesc = params.getValue('sDesc')
+
+    oRequest = cRequestHandler(entryUrl)
+    if cConfig().getSetting('global_search_' + SITE_IDENTIFIER) == 'true':
+        oRequest.cacheTime = 60 * 60 * 4  # 4 Stunden
+    sHtmlContent = oRequest.request()
+
+    # Pattern: Episoden der gewählten Staffel finden
+    pattern = 'id="season-%s(.*?)</ul>' % sSeason
+    isMatch, sHtmlContainer = cParser.parseSingleResult(sHtmlContent, pattern)
+    if isMatch:
+        isMatch, aResult = cParser.parse(sHtmlContainer, r'data-title="Episode\s(\d+)')
+    if not isMatch:
+        cGui().showInfo()
+        return
+
+    total = len(aResult)
+    for sEpisode in aResult:
+        oGuiElement = cGuiElement(cConfig().getLocalizedString(30513) + ' ' + str(sEpisode), SITE_IDENTIFIER, 'showEpisodeHosters')
+        oGuiElement.setThumbnail(sThumbnail)
+        if isDesc:
+            oGuiElement.setDescription(isDesc)
+        oGuiElement.setMediaType('episode')        # PFLICHT!
+        params.setParam('entryUrl', entryUrl)
+        params.setParam('season', sSeason)
+        params.setParam('episode', sEpisode)
+        cGui().addFolder(oGuiElement, params, False, total)
+    cGui().setView('episodes')
+    cGui().setEndOfDirectory()
+
+
+--- 7.5 showEpisodeHosters() — Hoster für eine Episode ---
+
+def showEpisodeHosters():
+    hosters = []
+    params = ParameterHandler()
+    sUrl = params.getValue('entryUrl')
+    sSeason = params.getValue('season')
+    sEpisode = params.getValue('episode')
+    sHtmlContent = cRequestHandler(sUrl, caching=False).request()
+    pattern = 'id="season-%s">(.*?)</ul>' % sSeason
+    isMatch, sHtmlContainer = cParser.parseSingleResult(sHtmlContent, pattern)
+    if isMatch:
+        pattern = '>%s</a>(.*?)</li>' % sEpisode
+        isMatch, sHtmlLink = cParser.parseSingleResult(sHtmlContainer, pattern)
+        if isMatch:
+            isMatch, aResult = cParser.parse(sHtmlLink, 'data-link="([^"]+)')
+            if isMatch:
+                sQuality = '720'
+                for sUrl in aResult:
+                    if 'youtube' in sUrl: continue
+                    elif sUrl.startswith('//'): sUrl = 'https:' + sUrl
+                    sName = cParser.urlparse(sUrl).split('.')[0].strip()
+                    if cConfig().isBlockedHoster(sName)[0]: continue
+                    hoster = {'link': sUrl, 'name': sName, 'displayedName': '%s [I][%sp][/I]' % (sName, sQuality), 'quality': sQuality}
+                    hosters.append(hoster)
+    if hosters:
+        hosters.append('getHosterUrl')
+    return hosters
+
+
+--- 7.6 showHosters() — Hoster für einen Film ---
+
+def showHosters():
+    hosters = []
+    params = ParameterHandler()
+    sUrl = params.getValue('entryUrl')
+    sHtmlContent = cRequestHandler(sUrl, caching=False).request()
+    pattern = 'data-link="([^"]+)'
+    isMatch, aResult = cParser.parse(sHtmlContent, pattern)
+    if isMatch:
+        sQuality = '720'
+        for sUrl in aResult:
+            if 'youtube' in sUrl: continue
+            elif sUrl.startswith('//'): sUrl = 'https:' + sUrl
+            sName = cParser.urlparse(sUrl).split('.')[0].strip()
+            if cConfig().isBlockedHoster(sName)[0]: continue
+            hoster = {'link': sUrl, 'name': sName, 'displayedName': '%s [I][%sp][/I]' % (sName, sQuality), 'quality': sQuality}
+            hosters.append(hoster)
+    if hosters:
+        hosters.append('getHosterUrl')
+    return hosters
+
+
+--- 7.7 getHosterUrl() — Finale Stream-URL ---
+
+def getHosterUrl(sUrl=False):
+    return [{'streamUrl': sUrl, 'resolved': False}]
+
+'resolved': False  = ResolveURL soll den Link noch auflösen
+'resolved': True   = Link ist bereits der finale Stream
+
+
+--- 7.8 showSearch() + _search() — Suche ---
+
+def showSearch():
+    win = xbmcgui.Window(10000)
+    sSearchText = win.getProperty('xstream.<SITE_IDENTIFIER>.lastSearchText')
+    if not sSearchText:
+        sSearchText = cGui().showKeyBoard(sHeading=cConfig().getLocalizedString(30281))
+        if not sSearchText: return
+        win.setProperty('xstream.<SITE_IDENTIFIER>.lastSearchText', sSearchText)
+    _search(False, sSearchText)
+    cGui().setEndOfDirectory()
+
+def _search(oGui, sSearchText):
+    showEntries(URL_SEARCH % cParser.quotePlus(sSearchText), oGui, sSearchText)
+
+
+--- 7.9 showValue() — Kategorien / Genre ---
+
+def showValue():
+    params = ParameterHandler()
+    oRequest = cRequestHandler(URL_MAIN)
+    if cConfig().getSetting('global_search_' + SITE_IDENTIFIER) == 'true':
+        oRequest.cacheTime = 60 * 60 * 48  # 48 Stunden
+    sHtmlContent = oRequest.request()
+    pattern = '>{0}</a>(.*?)</ul>'.format(params.getValue('Value'))
+    isMatch, sHtmlContainer = cParser.parseSingleResult(sHtmlContent, pattern)
+    if isMatch:
+        isMatch, aResult = cParser.parse(sHtmlContainer, 'href="([^"]+).*?>([^<]+)')
+    if not isMatch:
+        cGui().showInfo()
+        return
+    for sUrl, sName in aResult:
+        if sUrl.startswith('/'):
+            sUrl = URL_MAIN + sUrl
+        params.setParam('sUrl', sUrl)
+        cGui().addFolder(cGuiElement(sName, SITE_IDENTIFIER, 'showEntries'), params)
+    cGui().setEndOfDirectory()
+
+
+--- 7.10 showSearchPage() — Seitensprung ---
+
+Erlaubt dem User direkt auf eine bestimmte Seitenzahl zu springen,
+anstatt sich Seite für Seite durchzuklicken.
+Wird in showEntries() über oGui.searchNextPage() eingebunden.
+
+def showSearchPage():
+    params = ParameterHandler()
+    sNextPage = params.getValue('sNextPage')
+    sPageLast = params.getValue('sPageLast')
+    sHeading = cConfig().getLocalizedString(30282) + str(sPageLast)
+    sSearchPageText = cGui().showKeyBoard(sHeading=sHeading)
+    if not sSearchPageText: return
+    sNextSearchPage = sNextPage.split('page/')[0].strip() + 'page/' + sSearchPageText + '/'
+    showEntries(sNextSearchPage)
+    cGui().setEndOfDirectory()
+
+
+--- 7.11 showYearSearch() — Jahressuche ---
+
+Erlaubt dem User nach einem bestimmten Erscheinungsjahr zu filtern.
+Öffnet die Tastatur und erstellt daraus eine Such-URL.
+
+def showYearSearch():
+    sYear = cGui().showKeyBoard(sHeading=cConfig().getLocalizedString(30563))
+    if not sYear: return
+    searchUrl = URL_MAIN + '/xfsearch/' + sYear
+    showEntries(searchUrl)
+    cGui().setEndOfDirectory()
+
+
+============================================================================
+8. PARAMETER WEITERGEBEN
+============================================================================
+
+Parameter werden über den ParameterHandler von Funktion zu Funktion
+weitergegeben. Wichtig: Alle Daten die die nächste Funktion braucht
+müssen VOR dem addFolder() gesetzt werden.
+
+Typische Parameter:
+
+  params.setParam('sUrl', sUrl)              # URL für showEntries
+  params.setParam('entryUrl', sUrl)          # Detail-URL für showSeasons/showHosters
+  params.setParam('sThumbnail', sThumbnail)  # Thumbnail weitergeben
+  params.setParam('sDesc', sDesc)            # Beschreibung weitergeben
+  params.setParam('season', sSeason)         # Staffelnummer für showEpisodes
+  params.setParam('episode', sEpisode)       # Episodennummer für showEpisodeHosters
+  params.setParam('Value', 'KATEGORIEN')     # Genre-Auswahl für showValue
+  params.setParam('TVShowTitle', sName)      # Serienname (für Serien-only Seiten)
+
+In der nächsten Funktion dann auslesen:
+
+  sUrl = params.getValue('entryUrl')
+  sThumbnail = params.getValue('sThumbnail')
+  sSeason = params.getValue('season')
+
+--- setTVShowTitle() ---
+
+Bei Serien-only Seiten (AniWorld, SerienStream etc.) sollte der
+Serienname über setTVShowTitle() gesetzt werden, damit Kodi den
+Serientitel in der Episodenansicht korrekt anzeigt:
+
+    oGuiElement.setTVShowTitle(sName)
+    params.setParam('TVShowTitle', sName)
+
+
+============================================================================
+9. PAGINATION (Nächste Seite)
+============================================================================
+
+Wenn eine Seite mehrere Ergebnisseiten hat:
+
+    isMatchNextPage, sNextUrl = cParser.parseSingleResult(sHtmlContent, 'href="([^"]+)">Next')
+    if isMatchNextPage:
+        params.setParam('sUrl', sNextUrl)
+        oGui.addNextPage(SITE_IDENTIFIER, 'showEntries', params)
+
+Pagination nur anzeigen wenn NICHT aus der globalen Suche:
+
+    if not sGui and not sSearchText:
+        # Pagination hier
+        oGui.setView('movies')
+        oGui.setEndOfDirectory()
+
+
+============================================================================
+10. SPRACHFUNKTION
+============================================================================
+
+Sprachauswahl aus den xStream Einstellungen:
+
+    sLanguage = cConfig().getSetting('prefLanguage')
+    0 = Alle Sprachen
+    1 = Deutsch
+    2 = English
+    3 = Japanisch
+
+Beispiel im Menü:
+
+    def load():
+        params = ParameterHandler()
+        sLanguage = cConfig().getSetting('prefLanguage')
+        if sLanguage == '1':      # 1 = Deutsch
+            sLanguage = '2'
+        elif sLanguage == '2':    # 2 = Englisch
+            sLanguage = '3'
+        else:
+            sLanguage = 'all'     # 0 = Alle Sprachen
+        params.setParam('sLanguage', sLanguage)
+
+
+============================================================================
+11. QUALITÄTSFUNKTION
+============================================================================
+
+Qualitätsauswahl aus den xStream Einstellungen:
+
+    sQuality = cConfig().getSetting('preferedQuality')
+    params.setParam('sQuality', sQuality)
+
+
+============================================================================
+12. SEITEN NUR MIT SERIEN (Beispiel AniWorld)
+============================================================================
+
+Wenn eine Seite nur Serien hat, ist alles einfacher:
+  - Kein Film/Serie Erkennung nötig
+  - MediaType immer 'tvshow'
+  - Klick geht immer auf showSeasons()
+  - setTVShowTitle() für korrekten Serientitel in Episodenansicht
+
+def showEntries(entryUrl=False, sGui=False):
+    oGui = sGui if sGui else cGui()
+    params = ParameterHandler()
+    if not entryUrl:
+        entryUrl = params.getValue('sUrl')
+    oRequest = cRequestHandler(entryUrl, ignoreErrors=(sGui is not False))
+    if cConfig().getSetting('global_search_' + SITE_IDENTIFIER) == 'true':
+        oRequest.cacheTime = 60 * 60 * 6
+    sHtmlContent = oRequest.request()
+
+    pattern = '<a href="([^"]+).*?src="([^"]+).*?<h3>(.*?)<'
+    isMatch, aResult = cParser.parse(sHtmlContent, pattern)
+    if not isMatch:
+        if not sGui: oGui.showInfo()
+        return
+
+    total = len(aResult)
+    for sUrl, sThumbnail, sName in aResult:
+        oGuiElement = cGuiElement(sName, SITE_IDENTIFIER, 'showSeasons')
+        oGuiElement.setThumbnail(sThumbnail)
+        oGuiElement.setMediaType('tvshow')          # Immer tvshow!
+        oGuiElement.setTVShowTitle(sName)            # Serientitel setzen
+        params.setParam('sUrl', URL_MAIN + sUrl)
+        params.setParam('TVShowTitle', sName)
+        oGui.addFolder(oGuiElement, params, True, total)
+    if not sGui:
+        oGui.setView('tvshows')
+        oGui.setEndOfDirectory()
+
+
+============================================================================
+13. KOMPLETTER ABLAUF (Übersicht)
+============================================================================
+
+Film-Seite:
+  load() → showEntries() → showHosters() → getHosterUrl() → Wiedergabe
+
+Serien-Seite:
+  load() → showEntries() → showSeasons() → showEpisodes()
+       → showEpisodeHosters() → getHosterUrl() → Wiedergabe
+
+Suche:
+  load() → showSearch() → _search() → showEntries(sSearchText)
+       → showHosters/showSeasons → ...
+
+Globale Suche:
+  xstream.py searchGlobal() → _search(oGui, sSearchText)
+       → showEntries(sGui=oGui) → Ergebnisse
+
+Kategorien:
+  load() → showValue() → showEntries() → ...
+
+Seitensprung:
+  showEntries() → searchNextPage → showSearchPage() → showEntries(page)
+
+Jahressuche:
+  load() → showYearSearch() → showEntries() → ...
+
+
+============================================================================
+14. SETTINGS.XML — Eintrag für ein neues Site-Plugin
+============================================================================
+
+Jedes Site-Plugin braucht einen Eintrag in resources/settings.xml.
+Dieser Block muss in die <category> für Site-Plugins eingefügt werden.
+
+Ersetze "mysite" durch den SITE_IDENTIFIER deines Plugins.
+Ersetze "30999" durch die Label-Nummer deines Plugins in strings.po.
+
+Die Label-Nummern für die Standard-Texte:
+  30050 = "Site-Plugin verwenden"
+  30052 = "Für globale Suche verwenden"
+  30277 = "Domain automatisch aktualisieren & globale Suche"
+  30278 = "Aktuell verwendete Domain"
+  30411 = "(Neustart erforderlich!)"
+
+--- Settings-Block zum Kopieren ---
+
+			<group id="mysite" label="30999">
+				<setting id="plugin_mysite" type="boolean" label="30050" help="30411">
+					<level>0</level>
+					<default>True</default>
+					<control type="toggle"/>
+				</setting>
+				<setting id="global_search_mysite" type="boolean" label="30052">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_mysite">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_mysite_checkDomain" type="boolean" label="30277">
+					<level>3</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_mysite">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_mysite">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_mysite.domain" type="string" label="30278" help="">
+					<level>3</level>
+					<default/>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_mysite">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_mysite">false</dependency>
+					</dependencies>
+					<control type="edit" format="string">
+						<heading>30278</heading>
+					</control>
+				</setting>
+				<setting id="plugin_mysite_status" type="string" label="Dummy" help="">
+					<visible>false</visible>
+					<default>true</default>
+					<control type="toggle"/>
+				</setting>
+			</group>
+
+--- Was jede Setting-ID macht ---
+
+  plugin_mysite            Plugin ein/ausschalten (Toggle im Menü)
+  global_search_mysite     Plugin in die globale Suche einbinden (ja/nein)
+  plugin_mysite_checkDomain  Domain beim Start automatisch prüfen
+  plugin_mysite.domain     Vom User einstellbare Domain (leer = Standard aus dem Code)
+  plugin_mysite_status     Internes Status-Feld (unsichtbar, für Domain-Check Ergebnis)
+
+--- strings.po Eintrag ---
+
+Für jedes neue Site-Plugin muss auch ein Label in beiden Sprachdateien
+angelegt werden (resources/language/resource.language.de_de/strings.po
+und resources/language/resource.language.en_gb/strings.po):
+
+  msgctxt "#30999"
+  msgid "MeineSite"
+
+Die Nummer (hier 30999) muss eindeutig sein und zum label="30999"
+im settings.xml passen. Bestehende Nummern findest du in den
+strings.po Dateien — nimm die nächste freie Nummer.
+
+
+============================================================================

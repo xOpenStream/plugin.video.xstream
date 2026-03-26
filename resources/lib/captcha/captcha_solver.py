@@ -11,7 +11,7 @@ import time
 import xbmc
 import xbmcgui
 from resources.lib.handler.requestHandler import cRequestHandler
-from resources.lib.logger import Logger as logger
+from resources.lib.logger import logger
 from resources.lib.config import cConfig
 
 

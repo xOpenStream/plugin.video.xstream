@@ -9,8 +9,8 @@
 import xbmcgui
 from resources.lib.handler.ParameterHandler import ParameterHandler
 from resources.lib.handler.requestHandler import cRequestHandler
+from resources.lib.logger import logger
 from resources.lib.tools import cParser
-from resources.lib.logger import Logger as logger
 from resources.lib.gui.guiElement import cGuiElement
 from resources.lib.config import cConfig
 from resources.lib.gui.gui import cGui
@@ -154,12 +154,13 @@ def showEntries(entryUrl=False, sGui=False, sSearchText=False, sSearchPageText =
         isMatchSiteSearch, sHtmlContainer = cParser.parseSingleResult(sHtmlContent, 'class="pagination(.*?)</div></div>')
         if isMatchSiteSearch:
             isMatch, aResult = cParser.parse(sHtmlContainer, r'<span>([\d]+)</span>.*?nav_ext">.*?">([\d]+)</a>.*?href="([^"]+)')
-            for sPageActive, sPageLast, sNextPage in aResult:
-                #sPageName = '[I]Seitensuche starten  >>> [/I] Seite ' + str(sPageActive) + ' von ' + str(sPageLast) + ' Seiten  [I]<<<[/I]'
-                sPageName = cConfig().getLocalizedString(30284) + str(sPageActive) + cConfig().getLocalizedString(30285) + str(sPageLast) + cConfig().getLocalizedString(30286)
-                params.setParam('sNextPage', sNextPage)
-                params.setParam('sPageLast', sPageLast)
-                oGui.searchNextPage(sPageName, SITE_IDENTIFIER, 'showSearchPage', params)
+            if isMatch:
+                for sPageActive, sPageLast, sNextPage in aResult:
+                    #sPageName = '[I]Seitensuche starten  >>> [/I] Seite ' + str(sPageActive) + ' von ' + str(sPageLast) + ' Seiten  [I]<<<[/I]'
+                    sPageName = cConfig().getLocalizedString(30284) + str(sPageActive) + cConfig().getLocalizedString(30285) + str(sPageLast) + cConfig().getLocalizedString(30286)
+                    params.setParam('sNextPage', sNextPage)
+                    params.setParam('sPageLast', sPageLast)
+                    oGui.searchNextPage(sPageName, SITE_IDENTIFIER, 'showSearchPage', params)
             # End Page Function
         if isMatchNextPage:
             params.setParam('sUrl', sNextUrl)

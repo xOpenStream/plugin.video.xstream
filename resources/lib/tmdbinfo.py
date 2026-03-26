@@ -8,7 +8,7 @@ import xbmcgui
 
 from resources.lib.config import cConfig
 from resources.lib.tmdb import cTMDB
-from resources.lib.logger import Logger as logger
+from resources.lib.logger import logger
 from datetime import date, datetime
 from urllib.parse import urlencode
 
@@ -165,7 +165,7 @@ def WindowsBoxes(sTitle, sFileName, metaType, year=''):
                     )
                 except Exception:
                     import traceback
-                    xbmc.log('[xstream.trailer] onClick error: %s' % traceback.format_exc(), xbmc.LOGERROR)
+                    logger.error('-> [tmbdinfo]: trailer onClick error: %s' % traceback.format_exc())
                     xbmc.executebuiltin("Notification(Trailer, Trailer-Suche fehlgeschlagen, 3000, '')")
                 return
             elif controlId == 30:

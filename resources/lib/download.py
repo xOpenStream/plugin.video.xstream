@@ -9,7 +9,7 @@ import requests
 from resources.lib import utils
 from resources.lib.config import cConfig
 from resources.lib.gui.gui import cGui
-from resources.lib.logger import Logger as logger
+from resources.lib.logger import logger
 from xbmcvfs import translatePath
 
 # Default User-Agent to avoid CDN blocks
@@ -62,7 +62,7 @@ class cDownload:
 
     def __prepareDownload(self, url, header, sDownloadPath, downloadDialogTitle):
         try:
-            logger.debug('-> [download]: download file: ' + str(url) + ' to ' + str(sDownloadPath))
+            logger.debug(-> [download]: download file: ' + str(url) + ' to ' + str(sDownloadPath))
             self.__createProcessDialog(downloadDialogTitle)
             # Set User-Agent if not provided
             if 'User-Agent' not in header and 'user-agent' not in header:

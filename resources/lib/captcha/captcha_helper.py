@@ -5,7 +5,7 @@
 #
 # Captcha Helper
 
-from resources.lib.logger import Logger as logger
+from resources.lib.logger import logger
 from resources.lib.config import cConfig
 from resources.lib.captcha.captcha_solver import CaptchaSolver
 

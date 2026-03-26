@@ -9,7 +9,7 @@ def main():
     import os
 
     from resources.lib.config import cConfig
-    from resources.lib.logger import Logger as logger
+    from resources.lib.logger import logger
     from xbmcvfs import translatePath
 
     _addonPath_ = translatePath(cConfig().getAddonInfo('path'))
@@ -20,7 +20,7 @@ def main():
     sys.path.append(join(_addonPath_, 'resources', 'art'))
     sys.path.append(join(_addonPath_, 'sites'))    
     
-    logger.debug('Start xStream Log, Version %s ' % cConfig().getAddonInfo('version'))
+    logger.debug('Start xStream Log, Version %s' % cConfig().getAddonInfo('version'))
     logger.debug('Python-Version: %s' % platform.python_version())
 
     # RunScript handler for changelog button in settings

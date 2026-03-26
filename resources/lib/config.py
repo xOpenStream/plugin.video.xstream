@@ -6,8 +6,7 @@ import resolveurl as resolver
 import threading
 
 from urllib.parse import urlparse
-from resources.lib.logger import Logger
-
+from resources.lib.logger import logger
 
 class cConfig:
     _instances = {}  # Cache for addon_id -> cConfig instance
@@ -69,6 +68,6 @@ class cConfig:
             if i in domain.lower() or i.split('.')[0] in domain.lower(): return True, domain
         if checkResolver:   # Überprüfung in resolveUrl
             if resolver.relevant_resolvers(domain=domain) == []:
-                Logger.warning('-> [isblockedHoster]: In resolveUrl no domain for url: %s' % domain)
+                logger.warning('In resolveUrl no domain for url: %s' % domain)
                 return True, domain    # Domain nicht in resolveUrl gefunden
         return False, domain

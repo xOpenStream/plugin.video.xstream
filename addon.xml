@@ -1,10 +1,10 @@
-<?xml version='1.0' encoding='utf-8'?>
-<addon id="plugin.video.xstream" name="xStream" version="2026.03.25" provider-name="OG by xStreamTeam/Michaz Mod by Akisame">
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<addon id="plugin.video.xstream" name="xStream" version="2026.03.28" provider-name="Modded by Akisame">
 	<requires>
-		<import addon="xbmc.python" version="3.0.0" />
-		<import addon="script.module.requests" />
-		<import addon="script.module.resolveurl" />
-		<import addon="script.module.pyaes" />
+		<import addon="xbmc.python" version="3.0.0"/>
+		<import addon="script.module.requests"/>
+		<import addon="script.module.resolveurl"/>
+		<import addon="script.module.pyaes"/>
 	</requires>
 	<extension point="xbmc.python.pluginsource" library="default.py">
 		<provides>video</provides>

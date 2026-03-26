@@ -1,15 +1,13 @@
 # -*- coding: utf-8 -*-
 # Python 3
 
-import ast
 import xbmc
 import xbmcgui
 import hashlib
 import re
 import os
-import time, pyaes
+import pyaes
 
-from resources.lib.handler.ParameterHandler import ParameterHandler
 from xbmcvfs import translatePath
 from resources.lib.config import cConfig
 from urllib.parse import quote, unquote, quote_plus, unquote_plus, urlparse
@@ -227,6 +225,7 @@ class cParser:
         import base64
         return base64.b64decode(text).decode('utf-8')
 
+
 class cUtil:
     @staticmethod
     def removeHtmlTags(sValue, sReplace=''):
@@ -315,13 +314,6 @@ class cUtil:
             for token in tokens_sSearch
         ]
         return (sum(best_ratios) / len(best_ratios)) >= threshold
-
-def valid_email(email): #ToDo: Funktion in Settings / Konten aktivieren
-    # Überprüfen der EMail-Adresse mit dem Muster
-    if re.compile(r'^[\w\.-]+@[\w\.-]+\.\w+$').match(email):
-        return True
-    else:
-        return False
 
 def getDNS(dns):
     status = 'Beschäftigt'

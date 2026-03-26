@@ -10,8 +10,8 @@
 import xbmcgui
 from resources.lib.handler.ParameterHandler import ParameterHandler
 from resources.lib.handler.requestHandler import cRequestHandler
+from resources.lib.logger import logger
 from resources.lib.tools import cParser
-from resources.lib.logger import Logger as logger
 from resources.lib.gui.guiElement import cGuiElement
 from resources.lib.config import cConfig
 from resources.lib.gui.gui import cGui
@@ -72,11 +72,12 @@ def showValue():
     isMatch, sHtmlContainer = cParser.parseSingleResult(sHtmlContent, pattern)
     if isMatch:
         isMatch, aResult = cParser.parse(sHtmlContainer, 'href="([^"]+).*?>([^<]+)')
-        for sUrl, sName in aResult:
-            if sUrl.startswith('/'):
-                sUrl = URL_MAIN + sUrl
-            params.setParam('sUrl', sUrl)
-            cGui().addFolder(cGuiElement(sName, SITE_IDENTIFIER, 'showEntries'), params)
+        if isMatch:
+            for sUrl, sName in aResult:
+                if sUrl.startswith('/'):
+                    sUrl = URL_MAIN + sUrl
+                params.setParam('sUrl', sUrl)
+                cGui().addFolder(cGuiElement(sName, SITE_IDENTIFIER, 'showEntries'), params)
     if not isMatch:
         cGui().showInfo()
         return
@@ -142,12 +143,13 @@ def showEntries(entryUrl=False, sGui=False, sSearchText=False, sSearchPageText =
         isMatchSiteSearch, sHtmlContainer = cParser.parseSingleResult(sHtmlContent, 'class="pages">(.*?)<svg')
         if isMatchSiteSearch:
             isMatch, aResult = cParser.parse(sHtmlContainer, r'<span>([\d]+)</span>.*?">([\d]+)</a></div>.*?ref="([^"]+)')
-            for sPageActive, sPageLast, sNextPage in aResult:
-                #sPageName = '[I]Seitensuche starten  >>> [/I] Seite ' + str(sPageActive) + ' von ' + str(sPageLast) + ' Seiten  [I]<<<[/I]'
-                sPageName = cConfig().getLocalizedString(30284) + str(sPageActive) + cConfig().getLocalizedString(30285) + str(sPageLast) + cConfig().getLocalizedString(30286)
-                params.setParam('sNextPage', sNextPage)
-                params.setParam('sPageLast', sPageLast)
-                oGui.searchNextPage(sPageName, SITE_IDENTIFIER, 'showSearchPage', params)
+            if isMatch:
+                for sPageActive, sPageLast, sNextPage in aResult:
+                    #sPageName = '[I]Seitensuche starten  >>> [/I] Seite ' + str(sPageActive) + ' von ' + str(sPageLast) + ' Seiten  [I]<<<[/I]'
+                    sPageName = cConfig().getLocalizedString(30284) + str(sPageActive) + cConfig().getLocalizedString(30285) + str(sPageLast) + cConfig().getLocalizedString(30286)
+                    params.setParam('sNextPage', sNextPage)
+                    params.setParam('sPageLast', sPageLast)
+                    oGui.searchNextPage(sPageName, SITE_IDENTIFIER, 'showSearchPage', params)
             # End Page Function
         if isMatchNextPage:
             params.setParam('sUrl', sNextUrl)

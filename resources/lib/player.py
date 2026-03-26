@@ -4,7 +4,7 @@
 import xbmc
 from resources.lib.gui.gui import cGui
 from resources.lib.config import cConfig
-from resources.lib.logger import Logger as logger
+from resources.lib.logger import logger
 
 class XstreamPlayer(xbmc.Player):
     def __init__(self, *args, **kwargs):

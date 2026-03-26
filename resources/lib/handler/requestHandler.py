@@ -16,7 +16,7 @@ import http.client
 
 from resources.lib.config import cConfig
 from resources.lib.cache import cCache
-from resources.lib.logger import Logger as logger
+from resources.lib.logger import logger
 from xbmcvfs import translatePath
 
 from urllib.parse import quote, urlencode, urlparse, quote_plus

@@ -1104,12 +1104,6 @@
 
 		<category>
 			<group>
-				<setting id="enforceUpdate" type="boolean" label="30102" help="">
-					<level>0</level>
-					<default>False</default>
-					<visible>False</visible>
-					<control type="toggle"/>
-				</setting>
 				<setting id="newSetting" type="boolean" label="newSetting" help="">
 					<level>0</level>
 					<default>True</default>

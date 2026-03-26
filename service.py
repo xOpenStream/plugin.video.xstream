@@ -7,13 +7,13 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 from resources.lib.config import cConfig
-from resources.lib.cache import cCache
 from resources.lib import tools
-from resources.lib.logger import Logger as logger
+from resources.lib.logger import logger
 from resources.lib.handler.requestHandler import cRequestHandler
 from resources.lib.handler.pluginHandler import cPluginHandler
 from resources.lib import updateManager
 from resources.lib.utils import translatePath
+from resources.lib.cache import cCache
 from resources.lib.tools import infoDialog
 
 
@@ -33,10 +33,8 @@ def delHtmlCache():
 def _resolverUpdate():
     """Resolver Update im Hintergrund - gibt Status zurück für Notification."""
     try:
-        if not os.path.isfile(RESOLVE_SHA) or cConfig().getSetting('githubUpdateResolver') == 'true' or cConfig().getSetting('enforceUpdate') == 'true':
+        if not os.path.isfile(RESOLVE_SHA) or cConfig().getSetting('githubUpdateResolver') == 'true':
             status = updateManager.resolverUpdate()
-            if cConfig().getSetting('enforceUpdate') == 'true':
-                cConfig().setSetting('enforceUpdate', 'false')
             return status
     except Exception:
         import traceback
@@ -56,9 +54,9 @@ def main():
         # Domain Check läuft gleichzeitig im Main Thread
         cPluginHandler().checkDomain()
 
-        # Warte auf Resolver (falls noch nicht fertig, max 10 Sek)
+        # Warte auf Resolver (falls noch nicht fertig auf false setzen = fehler bei update meldung)
         try:
-            resolver_status = resolver_future.result(timeout=10)
+            resolver_status = resolver_future.result(timeout=18)
         except Exception:
             resolver_status = False
 

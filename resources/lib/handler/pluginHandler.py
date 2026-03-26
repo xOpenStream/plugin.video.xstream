@@ -7,7 +7,7 @@ import sys
 import xbmc
 
 from resources.lib.config import cConfig
-from resources.lib.logger import Logger as logger
+from resources.lib.logger import logger
 from resources.lib import utils
 from resources.lib.handler.requestHandler import cRequestHandler
 from urllib.parse import urlparse
