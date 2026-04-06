@@ -49,6 +49,7 @@ _api_checksum = _b64.b64decode(_API_CHECKSUM_B64).decode() if _API_CHECKSUM_B64 
 # ── Module-level cached state (persists for Kodi session, resets on restart) ───
 
 _smarttube_pkg = None      # SmartTube detection: None=unchecked, str=package, False=absent
+_SMARTTUBE_MIN_VERSION = '30.98'  # Minimum SmartTube version for trailer playback
 _yt_api_key = None         # YouTube API key: None=unchecked, str=key, ''=no key found
 _yt_api_dead = False       # Set on YT API HTTP 403 — skips all remaining YT API calls
 _yt_search_cache = {}      # Avoids duplicate YT searches: (title, year, lang) -> raw items
@@ -83,6 +84,84 @@ def _log(msg):
         pass
 
 
+# ── YouTube addon: ensure installed + enabled ─────────────────────────────────
+
+def _configureYouTubeAddon():
+    """Konfiguriert das YouTube-Addon nach Enable/Install (wizard aus, ISA an)."""
+    from xbmcaddon import Addon
+    yt = Addon('plugin.video.youtube')
+    yt.setSetting('kodion.setup_wizard', 'false')
+    yt.setSettingInt('kodion.setup_wizard.forced_runs', 1767970800)
+    yt.setSetting('kodion.video.quality.isa', 'true')
+    yt.setSetting('|end_settings_marker|', 'true')
+
+
+def _ensureYouTubeAddon(smarttube_low_ram=False):
+    """Stellt sicher dass das YouTube-Addon installiert und aktiviert ist.
+    smarttube_low_ram: True wenn SmartTube wegen RAM übersprungen wurde.
+    Return: True wenn Addon bereit, False wenn nicht."""
+    import xbmc, xbmcgui
+
+    # 1. Aktiv?
+    if xbmc.getCondVisibility('System.AddonIsEnabled(plugin.video.youtube)'):
+        return True
+
+    # 2. Installiert aber deaktiviert?
+    if xbmc.getCondVisibility('System.HasAddon(plugin.video.youtube)'):
+        if not xbmcgui.Dialog().yesno(
+                'Trailer',
+                'Das YouTube-Addon ist deaktiviert.\nFür Trailer-Wiedergabe aktivieren?'):
+            return False
+        import json
+        xbmc.executeJSONRPC(json.dumps({
+            'jsonrpc': '2.0', 'method': 'Addons.SetAddonEnabled',
+            'params': {'addonid': 'plugin.video.youtube', 'enabled': True}, 'id': 1}))
+        xbmc.sleep(1000)
+        try:
+            _configureYouTubeAddon()
+            _log('YouTube-Addon aktiviert und konfiguriert')
+        except Exception as e:
+            _log('YouTube-Addon Enable-Fehler: %s' % e)
+            return False
+        return True
+
+    # 3. Nicht installiert
+    if smarttube_low_ram:
+        msg = ('SmartTube hat zu wenig Arbeitsspeicher.\n'
+               'YouTube-Addon stattdessen installieren?')
+    else:
+        msg = ('Das YouTube-Addon wird für Trailer benötigt.\n'
+               'Jetzt installieren?')
+    if not xbmcgui.Dialog().yesno('Trailer', msg):
+        return False
+    try:
+        xbmc.executebuiltin('InstallAddon(plugin.video.youtube)')
+        xbmc.executebuiltin('SendClick(11)')
+        WINDOW_PROGRESS = xbmcgui.Window(10101)
+        xbmc.sleep(100)
+        CANCEL_BUTTON = WINDOW_PROGRESS.getControl(10)
+        CANCEL_BUTTON.setEnabled(False)
+        for _ in range(10):
+            xbmc.sleep(1000)
+            try:
+                from xbmcaddon import Addon
+                Addon('plugin.video.youtube')
+                break
+            except Exception:
+                pass
+        CANCEL_BUTTON.setEnabled(True)
+        _configureYouTubeAddon()
+        # Warten bis Addon initialisiert ist (access_manager.json etc.)
+        xbmc.sleep(3000)
+        _log('YouTube-Addon installiert und konfiguriert')
+    except Exception as e:
+        _log('YouTube-Addon Installation fehlgeschlagen: %s' % e)
+        xbmcgui.Dialog().notification('Trailer', 'YouTube-Addon konnte nicht installiert werden',
+                                      xbmcgui.NOTIFICATION_ERROR, 3000)
+        return False
+    return True
+
+
 # ── SmartTube detection (Android only) ─────────────────────────────────────────
 
 def _getSmartTubePackage():
@@ -104,19 +183,57 @@ def _getSmartTubePackage():
                                      stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                      timeout=5)
                 if ret.returncode == 0 and b'package:' in ret.stdout:
+                    # Version pruefen (>= _SMARTTUBE_MIN_VERSION)
+                    ver = _getSmartTubeVersion(pkg)
+                    if ver and ver < _SMARTTUBE_MIN_VERSION:
+                        _log('SmartTube %s zu alt: %s < %s' % (pkg, ver, _SMARTTUBE_MIN_VERSION))
+                        continue
                     _smarttube_pkg = pkg
-                    _log('SmartTube found: %s' % pkg)
+                    _log('SmartTube found: %s (version %s)' % (pkg, ver or 'unknown'))
                     return pkg
             except subprocess.TimeoutExpired:
                 _log('SmartTube: pm timeout for %s' % pkg)
                 continue
         _smarttube_pkg = False
-        _log('SmartTube not found')
+        _log('SmartTube not found (or too old)')
         return None
     except Exception as e:
         _log('SmartTube check failed: %s' % e)
         _smarttube_pkg = False
         return None
+
+
+def _getAvailableRAM():
+    """Liest MemAvailable aus /proc/meminfo (inkl. rueckforderbarer Kernel-Caches).
+    Gibt MB zurueck oder None bei Fehler."""
+    try:
+        with open('/proc/meminfo', 'r') as f:
+            for line in f:
+                if line.startswith('MemAvailable:'):
+                    return int(line.split()[1]) // 1024
+    except Exception:
+        pass
+    return None
+
+
+_SMARTTUBE_MIN_RAM_MB = 220  # Minimum MemAvailable fuer SmartTube (Kaltstart-Peak ~161MB PSS)
+
+
+def _getSmartTubeVersion(pkg):
+    """Liest versionName aus Android PackageManager. Gibt str zurueck oder None."""
+    try:
+        import subprocess
+        ret = subprocess.run(
+            ['sh', '-c', 'dumpsys package %s | grep versionName' % pkg],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=5)
+        if ret.returncode == 0 and ret.stdout:
+            # Output: "    versionName=30.98" — letztes Vorkommen nehmen
+            for line in ret.stdout.decode().strip().splitlines():
+                if 'versionName=' in line:
+                    return line.split('versionName=', 1)[1].strip()
+    except Exception as e:
+        _log('SmartTube version check failed: %s' % e)
+    return None
 
 
 # ── HTTP helper (bypass cRequestHandler — its __cleanupUrl double-encodes %22) ─
@@ -420,11 +537,13 @@ def _yearConflict(vtitle, year):
 
 
 def _titleOkChannel(vtitle, title, year=''):
-    """Title check for curated channel results (KinoCheck): title match, no Shorts, year conflict."""
+    """Title check for curated channel results (KinoCheck): title match, trailer word, no Shorts/junk, year conflict."""
     vl = _htmlDecode(vtitle).lower()
     if title.lower() not in vl:
         return False
-    if '#short' in vl:
+    if not any(w in vl for w in _TRAILER_WORDS):
+        return False
+    if any(w in vl for w in _JUNK_WORDS):
         return False
     if _yearConflict(vtitle, year):
         return False
@@ -529,7 +648,51 @@ def _tmdbVideos(data, lang=None):
 
 # ── Source-specific search functions ─────────────────────────────────────────
 
-def _searchKinoCheckAPI(tmdb_id, mediatype='movie', language='de'):
+def _extractSeasonFromTitle(title):
+    """Extract a season number from a KinoCheck video title.
+
+    Patterns matched (in priority order):
+      - "N. Staffel"  e.g. "THE BOYS 2. Staffel Trailer"
+      - "Staffel N"   e.g. "THE BOYS Staffel 3 Trailer"
+      - "Season N"    e.g. "COBRA KAI Season 4 Trailer"
+
+    Returns the season number as int, or None if no match.
+    """
+    # "N. Staffel" must be checked first so "2. Staffel" is not shadowed by
+    # a later "Staffel N" pattern that could match a trailing digit elsewhere.
+    m = re.search(r'(\d+)\.\s*[Ss]taffel', title)
+    if m:
+        return int(m.group(1))
+    m = re.search(r'[Ss]taffel\s+(\d+)', title)
+    if m:
+        return int(m.group(1))
+    m = re.search(r'[Ss]eason\s+(\d+)', title)
+    if m:
+        return int(m.group(1))
+    return None
+
+
+def _filterKinoCheckBySeason(hits, season):
+    """Filter a list of KinoCheck hit dicts to those matching *season*.
+
+    Args:
+        hits:   list of dicts, each with at least a 'name' key and optionally
+                a 'published' key (ISO date string).
+        season: int season number to keep, or None to return *hits* unchanged.
+
+    Returns:
+        If season is None  — the original list, unmodified.
+        Otherwise          — filtered list sorted by 'published' descending
+                             (hits without 'published' sort last).
+    """
+    if season is None:
+        return hits
+    filtered = [h for h in hits if _extractSeasonFromTitle(h.get('name', '')) == season]
+    filtered.sort(key=lambda h: h.get('published', ''), reverse=True)
+    return filtered
+
+
+def _searchKinoCheckAPI(tmdb_id, mediatype='movie', language='de', season=None):
     """Exact TMDB ID lookup via KinoCheck API. Free, no key required, no YT quota.
     NOT gated by _yt_api_dead — this uses kinocheck.de, not YouTube API.
     Returns (hits, api_ok):
@@ -563,6 +726,12 @@ def _searchKinoCheckAPI(tmdb_id, mediatype='movie', language='de'):
                 if cat in ('Trailer', 'Teaser'):
                     hits.append({'name': v.get('title', ''), 'key': vid, 'language': v.get('language', language)})
                     _log('KinoCheck-API video: %s %r cat=%s lang=%s' % (vid, v.get('title', '')[:60], cat, v.get('language', language)))
+        if season is not None:
+            filtered = _filterKinoCheckBySeason(hits, season)
+            if not filtered:
+                _log('KinoCheck-API: no hits for season=%s after filter' % season)
+                return [], True
+            return filtered, True
         return hits, True
     except Exception as e:
         _log('KinoCheck-API exception: %s' % e)
@@ -611,7 +780,7 @@ def _searchKinoCheck(title, year):
         return []
 
 
-def _searchYouTube(title, year, lang=''):
+def _searchYouTube(title, year, lang='', search_suffix=None):
     """Global YouTube search with strict title filter.
     Single query: "title" year trailer (maxResults=25).
     Results cached in _yt_search_cache. Cross-language cache hit for same-title movies.
@@ -655,7 +824,9 @@ def _searchYouTube(title, year, lang=''):
             return results
         # Build query — single pass: "title" year trailer
         parts = ['"%s"' % title]
-        if year:
+        if search_suffix:
+            parts.append(str(search_suffix))
+        elif year:
             parts.append(str(year))
         parts.append('trailer')
         query = ' '.join(parts)
@@ -792,7 +963,7 @@ def _searchIMDB(imdb_id):
 
 # ── Notification + playback ───────────────────────────────────────────────────
 
-def _notify(search_title, step, source, vtype, lang, poster):
+def _notify(search_title, step, source, vtype, lang, poster, vtype_prefix=''):
     """3-second notification popup (upper-right).
     Heading: search title used (DE or EN).
     Message: source - type [lang]  e.g. 'TMDB - Trailer [DE]'
@@ -801,7 +972,7 @@ def _notify(search_title, step, source, vtype, lang, poster):
     try:
         import xbmcgui
         icon = poster if poster else xbmcgui.NOTIFICATION_INFO
-        msg = '%s - %s [%s]' % (source, vtype, lang) if lang else '%s - %s' % (source, vtype)
+        msg = '%s - %s [%s]' % (source, vtype_prefix + vtype, lang) if lang else '%s - %s' % (source, vtype_prefix + vtype)
         xbmcgui.Dialog().notification(
             search_title,
             msg,
@@ -813,13 +984,23 @@ def _notify(search_title, step, source, vtype, lang, poster):
         pass
 
 
-def _play(video_id, step, source, vtype, lang, poster, search_title):
+def _play(video_id, step, source, vtype, lang, poster, search_title, vtype_prefix=''):
     """Show source/language popup then play via SmartTube (if installed) or YouTube addon."""
     import xbmc
+    if xbmc.getCondVisibility('Window.IsActive(busydialognocancel)'): xbmc.executebuiltin('Dialog.Close(busydialognocancel)')
     _log('PLAY video_id=%s step=%d source=%s vtype=%s lang=%s title=%r'
          % (video_id, step, source, vtype, lang, search_title))
-    _notify(search_title, step, source, vtype, lang, poster)
+    _notify(search_title, step, source, vtype, lang, poster, vtype_prefix=vtype_prefix)
     pkg = _getSmartTubePackage()
+    _smarttube_low_ram = False
+    if pkg:
+        avail_mb = _getAvailableRAM()
+        if avail_mb is not None and avail_mb < _SMARTTUBE_MIN_RAM_MB:
+            _log('SmartTube uebersprungen: nur %d MB frei (< %d MB)' % (avail_mb, _SMARTTUBE_MIN_RAM_MB))
+            pkg = None
+            _smarttube_low_ram = True
+        else:
+            _log('RAM check: %s MB frei' % (avail_mb if avail_mb is not None else 'n/a'))
     if pkg:
         xbmc.sleep(2000)  # let notification show before SmartTube covers Kodi UI
         _log('PLAY via SmartTube (%s)' % pkg)
@@ -831,6 +1012,8 @@ def _play(video_id, step, source, vtype, lang, poster, search_title):
             % (pkg, video_id)
         )
     else:
+        if not _ensureYouTubeAddon(smarttube_low_ram=_smarttube_low_ram):
+            return
         _log('PLAY via YouTube addon')
         xbmc.executebuiltin(
             'PlayMedia(plugin://plugin.video.youtube/play/?video_id=%s)' % video_id
@@ -860,12 +1043,14 @@ class _TrailerPlayer(object):
         return self._xbmc.getCondVisibility('Window.IsVisible(fullscreenvideo)')
 
 
-def _playDirect(url, step, source, vtype, lang, poster, search_title):
+def _playDirect(url, step, source, vtype, lang, poster, search_title, vtype_prefix=''):
     """Show source popup then play a direct MP4/M3U8 URL via Kodi's native player.
     Monitors fullscreen — stops playback when user presses back."""
+    import xbmc
+    if xbmc.getCondVisibility('Window.IsActive(busydialognocancel)'): xbmc.executebuiltin('Dialog.Close(busydialognocancel)')
     _log('PLAY-DIRECT url=%s step=%d source=%s vtype=%s title=%r'
          % (url[:80], step, source, vtype, search_title))
-    _notify(search_title, step, source, vtype, lang, poster)
+    _notify(search_title, step, source, vtype, lang, poster, vtype_prefix=vtype_prefix)
     tp = _TrailerPlayer()
     tp.play(url)
     # Wait for fullscreen to appear — exit early if playback fails
@@ -891,7 +1076,7 @@ def _playDirect(url, step, source, vtype, lang, poster, search_title):
 
 def _runTrailerSearch(tmdb_id, mediatype, title, en_title, year, poster,
                       imdb_id, languages, has_yt_player, has_own_key, skip_api,
-                      tmdb_videos):
+                      tmdb_videos, season=None, vtype_prefix=''):
     """Per-language priority block search — shared core for xStream/xShip.
 
     languages:   list of 1-3 ISO codes, e.g. ['de'] or ['ja', 'de', 'en']
@@ -933,7 +1118,7 @@ def _runTrailerSearch(tmdb_id, mediatype, title, en_title, year, poster,
                 kc_lang = 'de' if is_any else lang
                 step += 1
                 _log('--- [%s] KinoCheck API (lang=%s) ---' % (lang_label, kc_lang))
-                kc_hits, kc_ok = _searchKinoCheckAPI(tmdb_id, mediatype, language=kc_lang)
+                kc_hits, kc_ok = _searchKinoCheckAPI(tmdb_id, mediatype, language=kc_lang, season=season)
                 _log('[%s] KC-API: hits=%d ok=%s' % (lang_label, len(kc_hits), kc_ok))
                 if kc_hits:
                     if not skip_api:
@@ -947,12 +1132,12 @@ def _runTrailerSearch(tmdb_id, mediatype, title, en_title, year, poster,
                         kc_hits = _filterExistence(kc_hits)
                     if kc_hits:
                         _play(kc_hits[0]['key'], step, 'KinoCheck', 'Trailer',
-                              kc_lang.upper(), poster, lang_title)
+                              kc_lang.upper(), poster, lang_title, vtype_prefix=vtype_prefix)
                         return {'found_lang': kc_lang.upper(), 'source': 'KinoCheck'}
                     _log('[%s] KC-API: all results unavailable' % lang_label)
 
             # KinoCheck YT channel search: DE only, needs user's own key (100 units)
-            if (lang == 'de' or (is_any and 'de' not in languages)) and has_own_key:
+            if (lang == 'de' or (is_any and 'de' not in languages)) and has_own_key and not season:
                 step += 1
                 _log('--- [%s] KinoCheck YT channel ---' % lang_label)
                 kc_raw = _searchKinoCheck(lang_title, year)
@@ -960,7 +1145,7 @@ def _runTrailerSearch(tmdb_id, mediatype, title, en_title, year, poster,
                 _log('[%s] KC-YT: raw=%d filtered=%d' % (lang_label, len(kc_raw), len(kc_hit)))
                 if kc_hit:
                     _play(kc_hit[0]['key'], step, 'KinoCheck', 'Trailer',
-                          'DE', poster, lang_title)
+                          'DE', poster, lang_title, vtype_prefix=vtype_prefix)
                     return {'found_lang': 'DE', 'source': 'KinoCheck'}
 
             # TMDB videos: filter pre-fetched results by language (0 API calls)
@@ -976,7 +1161,7 @@ def _runTrailerSearch(tmdb_id, mediatype, title, en_title, year, poster,
             if videos:
                 vlang = (videos[0].get('iso_639_1') or lang or '??').upper()
                 _play(videos[0]['key'], step, 'TMDB', videos[0].get('type', 'Trailer'),
-                      vlang, poster, lang_title)
+                      vlang, poster, lang_title, vtype_prefix=vtype_prefix)
                 return {'found_lang': vlang, 'source': 'TMDB'}
 
         # IMDB direct MP4: EN block only, no player/key needed, ID-based
@@ -986,7 +1171,7 @@ def _runTrailerSearch(tmdb_id, mediatype, title, en_title, year, poster,
             imdb_url, imdb_quality = _searchIMDB(imdb_id)
             _log('[EN] IMDB: url=%s quality=%s' % (imdb_url[:80] if imdb_url else '', imdb_quality))
             if imdb_url:
-                _playDirect(imdb_url, step, 'IMDB', 'Trailer', '', poster, en_title or title)
+                _playDirect(imdb_url, step, 'IMDB', 'Trailer', '', poster, en_title or title, vtype_prefix=vtype_prefix)
                 return {'found_lang': 'EN', 'source': 'IMDB'}
 
     # YouTube global search (last resort, expensive: 100-201 units per language)
@@ -997,12 +1182,15 @@ def _runTrailerSearch(tmdb_id, mediatype, title, en_title, year, poster,
             yt_title = en_title if yt_lang == 'en' else title
             yt_upper = yt_lang.upper()
             _log('--- YouTube-%s search ---' % yt_upper)
-            yt_raw = _searchYouTube(yt_title, year, lang=yt_lang)
+            if season:
+                yt_raw = _searchYouTube(yt_title, '', lang=yt_lang, search_suffix='Season %s' % season)
+            else:
+                yt_raw = _searchYouTube(yt_title, year, lang=yt_lang)
             yt_hit = _filterByDuration(yt_raw, skip_api=skip_api, api_key=user_key)
             _log('YouTube-%s: raw=%d filtered=%d' % (yt_upper, len(yt_raw), len(yt_hit)))
-            if yt_hit and _oembedSanityCheck(yt_hit[0]['key'], yt_title, year):
+            if yt_hit and _oembedSanityCheck(yt_hit[0]['key'], yt_title, '' if season else year):
                 _play(yt_hit[0]['key'], step, 'YouTube', 'Trailer',
-                      yt_upper, poster, yt_title)
+                      yt_upper, poster, yt_title, vtype_prefix=vtype_prefix)
                 return {'found_lang': yt_upper, 'source': 'YouTube'}
 
     # ── Give up ───────────────────────────────────────────────────
@@ -1029,20 +1217,30 @@ def _showHintIfNeeded(has_yt_player, has_own_key, found_any, played_imdb, primar
             if not win.getProperty(_PROP_PREFIX + '.hint.player'):
                 xbmc.sleep(2000)
                 is_android = xbmc.getCondVisibility('System.Platform.Android')
+                # SmartTube nur empfehlen wenn genuegend RAM frei
+                avail_ram = _getAvailableRAM()
+                suggest_smarttube = is_android and (avail_ram is None or avail_ram >= _SMARTTUBE_MIN_RAM_MB)
                 has_kc = primary_lang in ('de', 'en')
-                if is_de_gui:
-                    sources = 'KinoCheck und TMDB' if has_kc else 'TMDB'
-                    player = 'SmartTube oder das YouTube Add-on' if is_android else 'das YouTube Add-on'
-                    msg = ('Dieser Trailer war auf Englisch (IMDB).\n'
-                           'F\u00fcr weitere Trailer in deiner Sprache von %s '
-                           '%s installieren (kein API-Key n\u00f6tig).' % (sources, player))
+                if suggest_smarttube:
+                    if is_de_gui:
+                        sources = 'KinoCheck und TMDB' if has_kc else 'TMDB'
+                        player = 'SmartTube oder das YouTube Add-on' if suggest_smarttube else 'das YouTube Add-on'
+                        msg = ('Dieser Trailer war auf Englisch (IMDB).\n'
+                               'F\u00fcr weitere Trailer in deiner Sprache von %s '
+                               '%s installieren (kein API-Key n\u00f6tig).' % (sources, player))
+                    else:
+                        sources = 'KinoCheck and TMDB' if has_kc else 'TMDB'
+                        player = 'SmartTube or the YouTube add-on' if suggest_smarttube else 'the YouTube add-on'
+                        msg = ('This trailer was in English (IMDB).\n'
+                               'For additional trailers in your language from %s '
+                               'install %s (no API key needed).' % (sources, player))
+                    xbmcgui.Dialog().ok('Trailer', msg)
+
                 else:
-                    sources = 'KinoCheck and TMDB' if has_kc else 'TMDB'
-                    player = 'SmartTube or the YouTube add-on' if is_android else 'the YouTube add-on'
-                    msg = ('This trailer was in English (IMDB).\n'
-                           'For additional trailers in your language from %s '
-                           'install %s (no API key needed).' % (sources, player))
-                xbmcgui.Dialog().ok('Trailer', msg)
+                    from xbmc import getCondVisibility, executebuiltin, sleep
+                    from xbmcaddon  import Addon
+                    import xbmcgui
+                    _ensureYouTubeAddon()
                 win.setProperty(_PROP_PREFIX + '.hint.player', '1')
                 _log('hint: showed player popup')
                 return True
@@ -1071,7 +1269,7 @@ def _showHintIfNeeded(has_yt_player, has_own_key, found_any, played_imdb, primar
 
 # ── Entry point (shared by xStream and xShip) ────────────────────────────────
 
-def playTrailer(tmdb_id, mediatype='movie', title='', year='', poster='', pref_lang='de'):
+def playTrailer(tmdb_id, mediatype='movie', title='', year='', poster='', pref_lang='de', season=None):
     """Trailer wrapper — detects capabilities, pre-fetches TMDB data,
     then calls _runTrailerSearch().
 
@@ -1084,7 +1282,10 @@ def playTrailer(tmdb_id, mediatype='movie', title='', year='', poster='', pref_l
         pref_lang: preferred trailer language code ('de', 'en', 'fr', ...)
                    xStream: context menu passes prefLanguage, TMDB dialog passes tmdb_lang.
                    xShip: default 'de'.
+        season:    season number (int/str) for season-specific trailer search, or None
     """
+    if season is not None:
+        season = int(season)
     import xbmc, xbmcgui
     from resources.lib.tmdb import cTMDB
 
@@ -1144,14 +1345,15 @@ def playTrailer(tmdb_id, mediatype='movie', title='', year='', poster='', pref_l
 
     # ── Capability detection (same for both addons) ────────────────
     smarttube = _getSmartTubePackage()  # Android only, cached for session
-    has_yt_addon = xbmc.getCondVisibility('System.HasAddon(plugin.video.youtube)')
-    if has_yt_addon:
-        try:
-            import xbmcaddon
-            xbmcaddon.Addon('plugin.video.youtube')
-        except Exception:
-            has_yt_addon = False
-            _log('YouTube addon found but not loadable — disabled/broken')
+    has_yt_addon = xbmc.getCondVisibility('System.AddonIsEnabled(plugin.video.youtube)')
+    if not has_yt_addon and not smarttube:
+        # Kein Player verfügbar -- YT-Addon installieren/aktivieren? (1x pro Session)
+        _win = xbmcgui.Window(10000)
+        if not _win.getProperty(_PROP_PREFIX + '.yt_declined'):
+            if _ensureYouTubeAddon():
+                has_yt_addon = True
+            else:
+                _win.setProperty(_PROP_PREFIX + '.yt_declined', '1')
     has_yt_player = bool(smarttube or has_yt_addon)  # can play YouTube video IDs
     has_own_key = bool(_getUserKey())                # user has own key for expensive searches
     skip_api = bool(smarttube)                       # SmartTube handles age-gates, skip videos.list
@@ -1181,9 +1383,15 @@ def playTrailer(tmdb_id, mediatype='movie', title='', year='', poster='', pref_l
     tmdb_en = cTMDB(lang='en')  # EN for English title + IMDB ID
     en_data = None
     try:
-        term = 'append_to_response=videos'
+        ## edit kasi - ,external_ids' sind nicht in en_data
+        # term = 'append_to_response=videos&include_video_language=de,en,null'
+        # if url_type == 'tv':
+        #     term += ',external_ids'
         if url_type == 'tv':
-            term += ',external_ids'
+            term = 'append_to_response=videos,external_ids&include_video_language=de,en,null'   # ,external_ids'  in en_data vorhanden!
+        else:
+            term = 'append_to_response=videos&include_video_language=de,en,null'
+        ## --------------------------
         en_data = tmdb_en.getUrl('%s/%s' % (url_type, tmdb_id), term=term)
         en_title = (en_data or {}).get(title_key, '') or title
     except Exception:
@@ -1195,6 +1403,18 @@ def playTrailer(tmdb_id, mediatype='movie', title='', year='', poster='', pref_l
     _log('EN title: %r imdb_id: %s tmdb_videos: %d results' % (
         en_title, imdb_id, len((tmdb_videos or {}).get('results', []))))
 
+    # ── Season-specific TMDB override (if season is set) ──────────────
+    if season:
+        try:
+            season_data = tmdb_en.getUrl('tv/%s/season/%s' % (tmdb_id, season),
+                term='append_to_response=videos&include_video_language=de,en,null')
+            tmdb_videos = (season_data or {}).get('videos', {})
+            imdb_id = ''  # Season pass must not use IMDB (no season-specific trailers)
+            _log('Season %s: tmdb_videos=%d results, imdb_id cleared' % (
+                season, len((tmdb_videos or {}).get('results', []))))
+        except Exception as e:
+            _log('Season %s TMDB fetch failed: %s' % (season, e))
+
     # ── Run per-language block search ────────────────────────────────
     result = _runTrailerSearch(
         tmdb_id=tmdb_id, mediatype=mediatype,
@@ -1202,7 +1422,32 @@ def playTrailer(tmdb_id, mediatype='movie', title='', year='', poster='', pref_l
         imdb_id=imdb_id, languages=languages,
         has_yt_player=has_yt_player, has_own_key=has_own_key, skip_api=skip_api,
         tmdb_videos=tmdb_videos,
+        season=season,
+        vtype_prefix='Staffel-' if season else '',
     )
+
+    # ── Season fallback: try series-level trailer if season search failed ──
+    if result is None and season:
+        _log('Season %s: kein Staffel-Trailer, Fallback auf Serien-Trailer' % season)
+        try:
+            fb_data = tmdb_en.getUrl('tv/%s' % tmdb_id,
+                term='append_to_response=videos,external_ids&include_video_language=de,en,null')
+            fb_videos = (fb_data or {}).get('videos', {})
+            fb_imdb = (fb_data or {}).get('external_ids', {}).get('imdb_id', '') or ''
+            fb_en_title = (fb_data or {}).get('name', '') or title
+            _log('Fallback: tmdb_videos=%d imdb=%s en_title=%r' % (
+                len((fb_videos or {}).get('results', [])), fb_imdb, fb_en_title))
+            result = _runTrailerSearch(
+                tmdb_id=tmdb_id, mediatype=mediatype,
+                title=title, en_title=fb_en_title, year=year, poster=poster,
+                imdb_id=fb_imdb, languages=languages,
+                has_yt_player=has_yt_player, has_own_key=has_own_key, skip_api=skip_api,
+                tmdb_videos=fb_videos,
+                season=None,
+                vtype_prefix='Serien-',
+            )
+        except Exception as e:
+            _log('Season fallback failed: %s' % e)
 
     # ── Post-search handling ─────────────────────────────────────────
     primary_lang = languages[0] if languages else 'de'
@@ -1238,7 +1483,7 @@ def hasTrailer(tmdb_id, imdb_id='', mediatype='movie'):
 
     # Detect YT player capability (same logic as playTrailer)
     smarttube_pkg = _getSmartTubePackage()
-    has_yt_addon = xbmc.getCondVisibility('System.HasAddon(plugin.video.youtube)')
+    has_yt_addon = xbmc.getCondVisibility('System.AddonIsEnabled(plugin.video.youtube)')
     has_yt_player = bool(smarttube_pkg) or has_yt_addon
 
     def _ck():
